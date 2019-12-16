@@ -1,7 +1,7 @@
 ./*
-./db/*
-./incremental_db/*
-./output_files/*
-!./output_files/Game.sof
-!./*.v
+db/
+incremental_db/
+output_files/
+!/output_files/Game.sof
+!/*.v
 !README.md
