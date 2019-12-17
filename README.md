@@ -6,9 +6,11 @@
 >graph TD
 >	p1(实现字符平滑下落)
 >	p2(实现键盘消除)
->	p3(加入FPS和积分功能)
+>	p3(加入FPS显示,积分功能和难度递增)
+>	p4(状态机实现界面切换)
 >	p1-->p2
 >	p2-->p3
+>	p3-->p4
 >```
 >
 
@@ -27,9 +29,9 @@ typedef struct{
     unsigned char val;
     struct CharInfo{
         unsigned ex:1;	   //存在位
-        unsigned speed:3;  //字符速度
-        unsigned x:5;	   //字符行坐标
-        unsigned y:7;	   //字符列坐标
+        unsigned speed:4;  //字符速度
+        unsigned x:9;	   //字符行坐标
+        unsigned y:10;	   //字符列坐标
     };
 }GenChar;
 ```
@@ -42,9 +44,9 @@ typedef struct{
 
 字符表项结构如CharInfo所示：
 
-|  15  | [14:12] | [11:7] | [6:0] |
-| :--: | :-----: | :----: | :---: |
-|  ex  |  speed  |   x    |   y   |
+|  23  | [22:19] | [18:10] | [9:0] |
+| :--: | :-----: | :-----: | :---: |
+|  ex  |  speed  |    x    |   y   |
 
 
 
@@ -102,21 +104,49 @@ assign raddr=x_addr+(y_addr-ram_offset)*70 //具体实现时将乘法改为位�
 
 ```verilog
 always @ (posedge render_clk) begin
-    if(CharTable[0][15])begin  //字符A存在
-        //我不确定Verilog是否可以这么写，后面实验试一下
-        //更新字符A的行坐标
-        CharTable[0][11:7]=CharTable[0][11:7]+CharTable[0][14:12]; 
-    end
-    if(CharTable[1][15])begin  //字符B存在
-        CharTable[1][11:7]=CharTable[1][11:7]+CharTable[1][14:12]; 
-    end
-    if(...)
-    if(...)
-    //一共26个if
+
+    CharTable[0][18:10]=CharTable[0][18:10]+CharTable[0][22:19]; 
+    CharTable[1][18:10]=CharTable[1][18:10]+CharTable[1][22:19]; 
+	...
+
 end
 ```
 
 然后在设置`VGA_DATA`模块中，使用26个if计算当前扫描点对应的字符号，并从字模ROM中取出点阵信息，然后根据点阵信息修改`VGA_DATA`
+
+```verilog
+always @(posedge VGA_CLK) begin
+    if(CharTable[0][15]) begin
+        if(CharTable[0][18:10]>v_addr&&CharTable[0][18:10]+9'd9<v_addr
+           &&CharTable[0][9:0]>h_addr&&CharTable[0][9:0]+10'd16<h_addr)
+            asc<=8'd97;
+    end
+    if...
+    if...
+end
+FontROM myfont(
+    .address((asc<<4)+v_offset),
+    .clock(VGA_CLK),
+	.q(font_line)
+); 
+always @ (posedge VGA_CLK) begin
+    if(font_line[h_offset])
+        data<=black;
+    else 
+        data<=white;
+end
+```
+
+> 显然，在25MHz的时钟频率下要做上百个if判断是不现实的，因此此方案也不可行
+
+#### 方案三
+
+两个想法  
+
+- 70*30显存RAM+偏移量表
+- 70 存储 480行偏移量
+
+
 
 
 
