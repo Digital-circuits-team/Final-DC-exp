@@ -6,3 +6,6 @@ output_files/
 !/*.v
 !README.md
 !pin assignment.txt
+!/*.qip
+!/*.mif
+!/*.hex
