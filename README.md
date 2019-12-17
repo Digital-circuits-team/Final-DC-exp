@@ -23,17 +23,28 @@
 产生的字符信息如下：
 
 ```c++
-typedef union{
-    struct{
-        unsigned speed:4;  //字符速度
+typedef struct{
+    unsigned char val;
+    struct CharInfo{
+        unsigned ex:1;	   //存在位
+        unsigned speed:3;  //字符速度
         unsigned x:5;	   //字符行坐标
         unsigned y:7;	   //字符列坐标
     };
-    short val;
-}CharInfo;
+}GenChar;
 ```
 
+使用随机序列发生器产生字符的字符号`val`、下降速度`speed` 、列坐标`y`
+
 ### 字符的存储
+
+使用字符表进行存储，共为26个表项，每个表项为十六位大小，采用reg进行存储
+
+字符表项结构如CharInfo所示：
+
+|  15  | [14:12] | [11:7] | [6:0] |
+| :--: | :-----: | :----: | :---: |
+|  ex  |  speed  |   x    |   y   |
 
 
 
@@ -87,15 +98,29 @@ assign raddr=x_addr+(y_addr-ram_offset)*70 //具体实现时将乘法改为位�
 
 #### 方案二
 
-exp09的指导手册上有这么一段话：
+使用一种更契合硬件描述语言的编码方式，在刷新一定帧数后对所有字符表项更新坐标
 
-> 如果每个像素点用3个8bit数来，一个像素点需要24bit，640×480的像素点需要7.372M bit的RAM。我们的FPGA只有5.57M bit片内内存，不够实现24bit颜色的VGA显存。
+```verilog
+always @ (posedge render_clk) begin
+    if(CharTable[0][15])begin  //字符A存在
+        //我不确定Verilog是否可以这么写，后面实验试一下
+        //更新字符A的行坐标
+        CharTable[0][11:7]=CharTable[0][11:7]+CharTable[0][14:12]; 
+    end
+    if(CharTable[1][15])begin  //字符B存在
+        CharTable[1][11:7]=CharTable[1][11:7]+CharTable[1][14:12]; 
+    end
+    if(...)
+    if(...)
+    //一共26个if
+end
+```
 
-但是，我们的游戏基本只需要黑白两色就足够，因此一个像素点只需要1bit来表示，因此只需要307.2K bit的RAM，即可实现640×480的分辨率！
+然后在设置`VGA_DATA`模块中，使用26个if计算当前扫描点对应的字符号，并从字模ROM中取出点阵信息，然后根据点阵信息修改`VGA_DATA`
 
 
 
 ## 实现键盘消除
 
-
+将键盘输入的ASCII码转换为字符号`asc-'a'`，然后在字符表中将`ex`位置为1即可
 
