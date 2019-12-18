@@ -144,9 +144,76 @@ end
 两个想法  
 
 - 70*30显存RAM+偏移量表
-- 70 存储 480行偏移量
+- 640 存储 480行偏移量
+
+数据结构
+
+```c++
+typedef struct{
+    int index;
+}ColumnInfo;
+
+typedef struct{
+	ColumnInfo col[640];    
+}ColumnTable;
+
+typedef struct{
+    char ch;
+    unsigned speed;
+    int offset;//[0,480]
+}CharInfo;
+
+#define CHAR_TABLE_SIZE 128
+typedef struct{
+    CharInfo chars[CHAR_TABLE_SIZE];
+}CharTable;
+```
 
 
+
+```verilog
+always @ (posedge VGA_CLK) begin   //获得当前列字符索引
+    if(ColumnTable[h_addr].index>0) begin
+        charIndex<=ColumnTable[h_addr].index;
+        h_offset<=0;
+    end
+    else begin
+        charIndex<=charIndex;
+		h_offset<=h_offset+1;
+    end
+end
+always @ (posedge VGA_CLK) begin 	//获取ASCII作为字模点阵索引
+    if(CharTable[charIndex].offset>v_addr&&CharTable[charIndex].offset<v_addr+16)
+    begin
+        asc<=CharTable[charIndex].ch;	       	    
+    end
+    else 
+        asc<=0;
+end
+FontROM myfont(						//取字模信息
+	.address((asc<<4)+v_offset),
+    .clock(VGA_CLK),
+	.q(font_line)
+);
+always @ (posedge VGA_CLK) begin	//输出
+    if(font_line[h_offset])
+        data<=black;
+    else
+        data<=white;
+end
+always @ (posedge VGA_CLK) begin    //字符移动
+    if(move_enable&&h_offset==0) begin
+        CharInfo[charIndex].offset=CharInfo[charIndex].offset
+        							+CharInfo[charIndex].speed;
+    end
+    else 
+        CharInfo[charIndex].offset<=CharInfo[charIndex].offset;
+end
+```
+
+消除方式：
+
+find
 
 
 
