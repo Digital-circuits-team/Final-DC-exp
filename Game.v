@@ -76,7 +76,8 @@ module Game(
 
 	wire moveable;  //每隔一定周期让字符下滑
 	
-		
+	
+	
 	//生成vga_clk
 	clkgen #(25000000) my_vgaclk(
 		.clkin(CLOCK_50), 
@@ -85,14 +86,14 @@ module Game(
 		.clkout(vga_clk) 
 	);
 	//用于随机生成字符的时钟
-	clkgen #(2000000) my_vgaclk(
+	clkgen #(2) my_generator_clk(
 		.clkin(CLOCK_50), 
 		.rst(SW[0]), 
 		.clken(1'b1), 
 		.clkout(generator_clk) 
 	);
 	//生成moveable
-	clkgen #(2) my_vgaclk(
+	clkgen #(2000000) my_moveable_clk(
 		.clkin(CLOCK_50), 
 		.rst(SW[0]), 
 		.clken(1'b1), 
@@ -137,10 +138,10 @@ module Game(
 	assign rom_outaddr=get_asc<<4'd4+v_offset;
 	
 	
-	always @ (posedge generator_clk) begin //TODO:可能会覆盖，待修改
+	/*always @ (posedge generator_clk) begin //TODO:可能会覆盖，待修改
 		offset[tmp_y][8:0]<=tmp_x;
 		speed[tmp_y][3:0]<=tmp_speed;
-	end
+	end*/
 	
 	always @ (posedge vga_clk) begin   //获取字符内列信息
 		if(columnTable[h_addr] == 1'b1) begin  //当前扫描处有新的字符
@@ -163,7 +164,11 @@ module Game(
 	end
 	
 	
-	always @ (posedge moveable) begin  //字符下滑
+	always @ (posedge moveable/* or posedge generator_clk*/) begin  //字符下滑
+		/*if(generator_clk==1'b1)begin  //生成字符，设置offset和speed；TODO:可能会覆盖，待修改
+			offset[tmp_y][8:0]<=tmp_x;
+			speed[tmp_y][3:0]<=tmp_speed;
+		end*/
 		if(h_offset==4'b0&&v_addr==offset[charIndex])begin
 			offset[charIndex]<=offset[charIndex]+speed[charIndex];
 		end
