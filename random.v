@@ -1,10 +1,11 @@
-module random(clk,rst,seed,randomNum);
+module random(clk,randomNum);
     input clk;
-    input rst;
-    input [11:0] seed;
     output reg [11:0] randomNum;
     reg lin;
-
+	 parameter seed = 12'd0;
+	 initial begin
+			randomNum=seed;
+	 end
     always @ (posedge clk) begin
         if(rst) begin
             randomNum = seed;
@@ -25,4 +26,4 @@ module random(clk,rst,seed,randomNum);
     end
 
 
-endmodule
+endmodule 
