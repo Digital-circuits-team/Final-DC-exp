@@ -7,7 +7,7 @@ module Lattice_ROM(clk, outaddr, dout);  //用寄存器实现的点阵ROM
 	
 	initial 
 	begin
-		$readmemh("E:/Final-DC-exp/mem.txt", rom); 
+		$readmemh("./mem.txt", rom); 
 	end
 	
 	always @(posedge clk) 
