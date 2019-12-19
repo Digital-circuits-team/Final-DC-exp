@@ -58,8 +58,7 @@ module Game(
 	wire [9:0] h_addr,v_addr;
 
 
-	wire en;  //字符显存写入使能端
-
+	//wire en;  //字符显存写入使能端
 	
 	//asc_ram
 	wire [11:0] inaddr;  //写入字符显存中的地址
@@ -76,11 +75,30 @@ module Game(
 	reg [11:0] charIndex;  //当前字符索引
 
 	wire moveable;  //每隔一定周期让字符下滑
+	
 		
-	//产生一个周期为1秒的时钟
-	sec_clk sec(.clk(CLOCK_50),.out_clk(generator_clk));
-	//TODO:生成moveable,待修改
-	sec_clk sec2(.clk(vga_clk),.out_clk(moveable));
+	//生成vga_clk
+	clkgen #(25000000) my_vgaclk(
+		.clkin(CLOCK_50), 
+		.rst(SW[0]), 
+		.clken(1'b1), 
+		.clkout(vga_clk) 
+	);
+	//用于随机生成字符的时钟
+	clkgen #(2000000) my_vgaclk(
+		.clkin(CLOCK_50), 
+		.rst(SW[0]), 
+		.clken(1'b1), 
+		.clkout(generator_clk) 
+	);
+	//生成moveable
+	clkgen #(2) my_vgaclk(
+		.clkin(CLOCK_50), 
+		.rst(SW[0]), 
+		.clken(1'b1), 
+		.clkout(moveable) 
+	);
+	
 	
 	//随机生成字符
 	Generator gen(.clk(generator_clk),.ch(char),.speed(tmp_speed),.x(tmp_x),.y(tmp_y));
@@ -88,23 +106,15 @@ module Game(
 	//点阵ROM，取出字模信息color_bit
 	Lattice_ROM lat_rom(.clk(CLOCK_50), .outaddr(rom_outaddr), .dout(color_bit)); 
 	
-	asc_ram ram(  //字符显存，写入char/读出get_asc
-		.clock(CLOCK_50),
+	ascii_ram ram(  //字符显存，写入char/读出get_asc
 		.data(char),
 		.rdaddress(outaddr),
+		.rdclock(vga_clk),
 		.wraddress(inaddr),
-		.wren(en),
+		.wrclock(generator_clk),
+		.wren(1'b1),
 		.q(get_asc)
 		); 
-	
-	
-	clkgen #(25000000) my_vgaclk(
-		.clkin(CLOCK_50), 
-		.rst(SW[0]), 
-		.clken(1'b1), 
-		.clkout(vga_clk) 
-	);
-	
 
 	vga_ctrl my_vga_ctrl( 
 		.pclk(vga_clk), //25MHz时钟 
@@ -130,7 +140,6 @@ module Game(
 	always @ (posedge generator_clk) begin //TODO:可能会覆盖，待修改
 		offset[tmp_y][8:0]<=tmp_x;
 		speed[tmp_y][3:0]<=tmp_speed;
-		en<=/*TODO:???*/
 	end
 	
 	always @ (posedge vga_clk) begin   //获取字符内列信息
@@ -145,8 +154,8 @@ module Game(
 	end
 	
 	always @ (posedge vga_clk) begin   //获取字符内行信息
-		if(v_addr>=offset[h_addr]&&offset[h_addr]+4'd15>=v_addr) begin   
-			v_offset<=v_addr-offset[h_addr];
+		if(v_addr>=offset[charIndex]&&offset[charIndex]+4'd15>=v_addr) begin   
+			v_offset<=v_addr-offset[charIndex];
 		end
 		else begin	
 			v_offset<=4'b0;
@@ -155,7 +164,7 @@ module Game(
 	
 	
 	always @ (posedge moveable) begin  //字符下滑
-		if(h_offset==4'b0&&v_addr==offset[h_addr])begin
+		if(h_offset==4'b0&&v_addr==offset[charIndex])begin
 			offset[charIndex]<=offset[charIndex]+speed[charIndex];
 		end
 		else begin
@@ -165,7 +174,7 @@ module Game(
 	
 	
 	always @ (posedge vga_clk) begin   //设置vga_data，显示
-			if(columnTable[h_addr] == 1'b1 && (color_bit>>h_offset)&12'h001 == 1'b1)begin  //取出的一位bit信息为1 
+			if((color_bit>>h_offset)&12'h001 == 1'b1)begin  //取出的一位bit信息为1 
 				vga_data = 24'hffffff;  //white
 			end
 			else begin
