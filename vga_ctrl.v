@@ -4,8 +4,6 @@ module vga_ctrl(
 	input [23:0] vga_data, //上层模块提供的VGA颜色数据 
 	output [9:0] h_addr, //提供给上层模块的当前扫描像素点坐标 
 	output [9:0] v_addr, 
-	output [10:0] x_addr, //对应到70*30的坐标 
-	output [10:0] y_addr,
 	output hsync, //行同步和列同步信号 
 	output vsync, 
 	output valid, //消隐信号 
@@ -67,9 +65,5 @@ module vga_ctrl(
 	assign vga_r = vga_data[23:16]; 
 	assign vga_g = vga_data[15:8]; 
 	assign vga_b = vga_data[7:0]; 
-	
-	//计算对应到70*30的坐标
-	assign x_addr = h_addr/4'd9;  
-	assign y_addr = v_addr>>4'd4;
 
 endmodule 
