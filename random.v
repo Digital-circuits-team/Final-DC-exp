@@ -2,7 +2,7 @@ module random(clk,rst,seed,randomNum);
     input clk;
     input rst;
     input [11:0] seed;
-    output [11:0] randomNum;
+    output reg [11:0] randomNum;
     reg lin;
 
     always @ (posedge clk) begin
