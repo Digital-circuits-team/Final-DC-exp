@@ -8,18 +8,19 @@ module Generator(clk,ch,speed,x,y);
 
 	 wire [11:0] ran_y;
 	 wire [7:0] ran_ch;
+	 wire [3:0] ran_speed;
 	 
-    random8 random_speed(
+    random8 #(2) random_speed(
         .clk(clk),
-        .randomNum(speed)
+        .randomNum(ran_speed)
     );
 
-    random12 random_y(
+    random12 #(315) random_y(
         .clk(clk),
         .randomNum(ran_y)
     );
 	 
-	 random8 random_ch(
+	 random8 #(9) random_ch(
 			.clk(clk),
 			.randomNum(ran_ch)
 	 );
@@ -30,5 +31,7 @@ module Generator(clk,ch,speed,x,y);
 	 assign x = 9'd0;
 
 	 assign ch = 8'd97+ran_ch%26;
+	 
+	 assign speed = ran_speed == 0 ? 4'd1:ran_speed;
 
 endmodule 
