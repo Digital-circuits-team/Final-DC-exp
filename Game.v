@@ -46,7 +46,13 @@ module Game(
 
 
 );
+
+	//out_clk
+	wire generator_clk;
 	
+	//Generator
+	wire char,tmp_speed,tmp_x,tmp_y;
+
 	//vga_ctrl
 	reg [23:0] vga_data;
 	wire [9:0] h_addr,v_addr;
@@ -63,19 +69,28 @@ module Game(
 	
 	//other
 	reg [8:0] offset[639:0]; //行偏移量
-	reg [2:0] speed[639:0];  //速度
+	reg [3:0] speed[639:0];  //速度
 	reg [9:0] h_offset;  //字符内列信息，防止溢出故设为10位
 	reg [3:0] v_offset;  //字符内行信息
 	reg [639:0] columnTable;  //判断某一列是否有字符
 	reg [11:0] charIndex;  //当前字符索引
 
+	wire moveable;  //每隔一定周期让字符下滑
+		
+	//产生一个周期为1秒的时钟
+	sec_clk sec(.clk(CLOCK_50),.out_clk(generator_clk));
+	//TODO:生成moveable,待修改
+	sec_clk sec2(.clk(vga_clk),.out_clk(moveable));
+	
+	//随机生成字符
+	Generator gen(.clk(generator_clk),.ch(char),.speed(tmp_speed),.x(tmp_x),.y(tmp_y));
 
 	//点阵ROM，取出字模信息color_bit
 	Lattice_ROM lat_rom(.clk(CLOCK_50), .outaddr(rom_outaddr), .dout(color_bit)); 
 	
-	asc_ram ram(  //字符显存，写入ascii/读出get_asc
+	asc_ram ram(  //字符显存，写入char/读出get_asc
 		.clock(CLOCK_50),
-		.data(ascii),
+		.data(char),
 		.rdaddress(outaddr),
 		.wraddress(inaddr),
 		.wren(en),
@@ -106,11 +121,17 @@ module Game(
 	); 
 	assign VGA_SYNC_N = 0;
 
-
-	assign inaddr=charIndex; //依据inaddr查询字符RAM
+	assign inaddr=tmp_y;
+	assign outaddr=charIndex; //依据outaddr查询字符RAM
 	
 	assign rom_outaddr=get_asc<<4'd4+v_offset;
 	
+	
+	always @ (posedge generator_clk) begin //TODO:可能会覆盖，待修改
+		offset[tmp_y][8:0]<=tmp_x;
+		speed[tmp_y][3:0]<=tmp_speed;
+		en<=/*TODO:???*/
+	end
 	
 	always @ (posedge vga_clk) begin   //获取字符内列信息
 		if(columnTable[h_addr] == 1'b1) begin  //当前扫描处有新的字符
@@ -133,8 +154,8 @@ module Game(
 	end
 	
 	
-	always @ (posedge vga_clk) begin  //字符下滑
-		if(columnTable[h_addr] == 1'b1&&v_addr==offset[h_addr])begin
+	always @ (posedge moveable) begin  //字符下滑
+		if(h_offset==4'b0&&v_addr==offset[h_addr])begin
 			offset[charIndex]<=offset[charIndex]+speed[charIndex];
 		end
 		else begin
