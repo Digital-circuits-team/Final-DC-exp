@@ -1,6 +1,6 @@
 module Generator(clk,newCh,speed,y);
     input clk;
-    output [23:0] newCh;
+    output [22:0] newCh;
 
     output wire [11:0] speed;
 	 wire [11:0] ran_y;
@@ -26,7 +26,7 @@ module Generator(clk,newCh,speed,y);
     assign y = ran_y - div_y<<7 - div_y<<9;  //y % 640
    
 
-    assign newCh = {1'b1,speed[3:0],9'd0,y[9:0]};
+    assign newCh = {speed[3:0],9'd0,y[9:0]};
 
 
 endmodule
