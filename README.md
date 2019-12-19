@@ -28,7 +28,6 @@
 typedef struct{
     unsigned char val;
     struct CharInfo{
-        unsigned ex:1;	   //存在位
         unsigned speed:4;  //字符速度
         unsigned x:9;	   //字符行坐标
         unsigned y:10;	   //字符列坐标
@@ -44,9 +43,9 @@ typedef struct{
 
 字符表项结构如CharInfo所示：
 
-|  23  | [22:19] | [18:10] | [9:0] |
-| :--: | :-----: | :-----: | :---: |
-|  ex  |  speed  |    x    |   y   |
+| [22:19] | [18:10] | [9:0] |
+| :-----: | :-----: | :---: |
+|  speed  |    x    |   y   |
 
 
 
@@ -211,13 +210,13 @@ always @ (posedge VGA_CLK) begin    //字符移动
 end
 ```
 
-消除方式：
 
-find
 
 
 
 ## 实现键盘消除
 
-将键盘输入的ASCII码转换为字符号`asc-'a'`，然后在字符表中将`ex`位置为1即可
 
+消除方式：
+
+find数组消除
