@@ -1,6 +1,6 @@
-module Generator(clk,ch,speed,x,y);
+module Generator(clk,ch,speed,x,y,out_enable);
     input clk;
-
+	 output out_enable;
 	 output [7:0] ch;
     output [3:0] speed;
 	 output [8:0] x;
@@ -25,6 +25,7 @@ module Generator(clk,ch,speed,x,y);
 			.randomNum(ran_ch)
 	 );
 	
+	 assign out_enable = clk;
 	 
     assign y = ran_y%640;  
    
