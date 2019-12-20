@@ -46,7 +46,10 @@ module Game(
 
 
 );
-
+	parameter lower_bound = 10'd480;
+	parameter white = 24'hFFFFFF;
+	parameter black = 24'h000000;
+	
 	//out_clk
 	wire generator_clk;
 	
@@ -84,10 +87,19 @@ module Game(
 	reg [9:0] charIndex;  //当前字符索引
 
 	reg [18:0] countclk;
-	reg [5:0] count;
+	reg [6:0] count;
 	reg moveable;  //每隔一定周期让字符下滑
 	
+	reg gameover; //游戏结束标志
+	reg w_signal; //字符消除信号
+	wire [7:0] in_char; //写入字符
+	wire asc_wren;//字符显存写使能
+	
+	
 	initial begin
+		
+		w_signal=1'b0;
+		gameover=1'b0;
 		count=6'd0;
 		countclk=19'd0;
 		moveable=1'b0;
@@ -116,16 +128,22 @@ module Game(
 
 	//点阵ROM，取出字模信息color_bit
 	Lattice_ROM lat_rom(.clk(CLOCK_50), .outaddr(rom_outaddr), .dout(color_bit)); 
-
+	
+	hex_decoder mychar(1'b1,in_char,{HEX1,HEX0});
+	
+	
+	//TODO: assign addr
+	assign in_char = (w_signal&1'b1)?8'd32:char;
+	assign asc_wren = generator_clk|w_signal; //字符显存写使能
 	ascii_ram ram(  //字符显存，写入char/读出get_asc
-		.data(char),
+		.data(in_char),
 		.rdaddress(outaddr),
 		.rdclock(VGA_CLK),
 		.wraddress(inaddr),
-		.wrclock(generator_clk),
-		.wren(1'b1),
+		.wrclock(VGA_CLK),
+		.wren(asc_wren),
 		.q(get_asc)
-		); 
+	); 
 	
 	vga_ctrl my_vga_ctrl( 
 		.pclk(VGA_CLK), //25MHz时钟 
@@ -188,18 +206,32 @@ module Game(
 	
 	
 	always @ (posedge VGA_CLK) begin  //字符产生及下滑
+	w_signal<=1'b0;//可能w_signal的赋值方式会产生冲突
 		if(generator_clk)begin  //生成字符，设置offset和speed；TODO:可能会覆盖，待修改
 			offset[tmp_y][8:0]<=tmp_x;
 			speed[tmp_y][3:0]<=tmp_speed;
 			columnTable[tmp_y]<=1'b1;
 			if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
+				if(offset[charIndex]>=lower_bound) begin
+					gameover <= 1'b1;
+					speed[charIndex]<=4'd0;
+					offset[charIndex]<=10'd0;
+					w_signal <= 1'b1;
+				end
 			end
 			else begin offset[charIndex]<=offset[charIndex]; end
 		end
 		else begin
 			if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
+				if(offset[charIndex]>=lower_bound) begin
+					gameover <= 1'b1;
+					//临时擦除字符试验
+					speed[charIndex]<=4'd0;
+					offset[charIndex]<=10'd0;
+					w_signal <= 1'b1;
+				end
 			end
 			else begin offset[charIndex]<=offset[charIndex]; end
 		end
@@ -207,11 +239,12 @@ module Game(
 	
 	always @ (posedge VGA_CLK) begin   //设置vga_data，显示
 			if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 1'b1)begin  //取出的一位bit信息为1 
-				vga_data = 24'hffffff;  //black
+				vga_data = black;  //black
 			end
 			else begin
-				vga_data = 24'h000000;
+				vga_data = white;
 			end
 	end
 
+	assign LEDR[0]=gameover;
 endmodule 
