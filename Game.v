@@ -79,24 +79,32 @@ module Game(
 	wire [9:0] inaddr;  //写入字符显存中的地址
 	wire [9:0] outaddr;  //读取字符显存中该地址
 	wire [7:0] get_asc; //从字符显存中读取到的ASCII码（8位）
-	
+	wire [11:0] get_asc_12bit;
 	
 	//other
 	reg [8:0] offset[639:0]; //行偏移量
 	reg [3:0] speed[639:0];  //速度
 	reg [9:0] h_offset;  //字符内列信息，防止溢出故设为10位
 	reg [3:0] v_offset;  //字符内行信息
-	//reg [639:0] columnTable;  //判断某一列是否有字符
+	reg [639:0] columnTable;  //判断某一列是否有字符
 	reg [11:0] charIndex;  //当前字符索引
-	wire colInfo;//标志当前列是否存在字符
+	//wire colInfo;//标志当前列是否存在字符
 	
-	wire moveable;  //每隔一定周期让字符下滑
+	reg [18:0] countclk;
+	reg [5:0] count;
+	reg moveable;  //每隔一定周期让字符下滑
 	
 	
 	//初始化
 	initial begin
 		state = WEL_STATE;
-		
+		count=6'd0;
+		countclk=19'd0;
+		moveable=1'b0;
+		h_offset=10'd0;
+		v_offset=4'd0;
+		columnTable=640'b0;
+		flag=1'b0;
 	
 	end
 	
@@ -115,14 +123,6 @@ module Game(
 		.clken(1'b1), 
 		.clkout(generator_clk) 
 	);
-	//生成moveable
-	clkgen #(2000000) my_moveable_clk(
-		.clkin(CLOCK_50), 
-		.rst(SW[0]), 
-		.clken(1'b1), 
-		.clkout(moveable) 
-	);
-	
 	
 	//随机生成字符
 	Generator gen(.clk(generator_clk),.ch(char),.speed(tmp_speed),.x(tmp_x),.y(tmp_y));
@@ -168,48 +168,63 @@ module Game(
 	assign inaddr=tmp_y;
 	assign outaddr=charIndex; //依据outaddr查询字符RAM
 	
-	assign rom_outaddr=get_asc<<4'd4+v_offset;
+	assign get_asc_12bit = get_asc<<4'd4;
+	assign rom_outaddr=get_asc_12bit + v_offset;
 	
-	always @ (posedge VGA_CLK) begin   //获取字符内列信息
-		if(colInfo) begin  //当前扫描处有新的字符
-			charIndex<=h_addr;
-			h_offset<=4'b0;
+	//生成moveable
+	always @ (posedge VGA_CLK) begin 
+		countclk=countclk+1'b1;
+		if(countclk==19'd420000)begin
+			count=count+6'd1;
+			countclk=19'd0;
 		end
-		else begin
-			charIndex<=charIndex;
-			h_offset<=h_offset+10'd1;  //可能溢出
+		if(count==6'd1)begin
+			count=6'd0;
+			moveable=1'b1;
+		end
+		else if(countclk==19'd830)begin
+			moveable=1'b0;
 		end
 	end
 	
-	always @ (posedge VGA_CLK) begin   //获取字符内行信息
+	
+	always @ (posedge VGA_CLK) begin   //获取字符内列信息
+		if(columnTable[h_addr] == 1'b1) begin  //当前扫描处有新的字符
+			charIndex=h_addr;
+			h_offset=10'd0;
+		end
+		else begin
+			charIndex=charIndex;
+			h_offset=h_offset+10'd1;  //可能溢出
+		end
+	end
+	
+	always @ (posedge VGA_CLK) begin   //获取字符内行信息,no problem
 		if(v_addr>=offset[charIndex]&&offset[charIndex]+4'd15>=v_addr) begin   
-			v_offset<=v_addr-offset[charIndex];
+			v_offset<=(v_addr-offset[charIndex])&10'b0000001111;
+			flag<=1'b1;
 		end
 		else begin	
 			v_offset<=4'b0;
+			flag<=1'b0;
 		end
 	end
-	
 	
 	always @ (posedge moveable or posedge generator_clk) begin  //字符下滑
 		if(generator_clk)begin  //生成字符，设置offset和speed；TODO:可能会覆盖，待修改
 			offset[tmp_y][8:0]<=tmp_x;
 			speed[tmp_y][3:0]<=tmp_speed;
 			//columnTable[tmp_y]=1'b1;
-			if(h_offset==4'b0&&v_addr==offset[charIndex])begin
+			if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
 			end
-			else begin
-				offset[charIndex]<=offset[charIndex];
-			end
+			else begin offset[charIndex]<=offset[charIndex]; end
 		end
 		else begin 
-			if(h_offset==4'b0&&v_addr==offset[charIndex])begin
+			if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
 			end
-			else begin
-				offset[charIndex]<=offset[charIndex];
-			end
+			else begin offset[charIndex]<=offset[charIndex]; end
 		end
 	end
 	
