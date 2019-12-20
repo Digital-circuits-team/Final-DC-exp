@@ -9,3 +9,5 @@ output_files/
 !/*.qip
 !/*.mif
 !/*.hex
+!img
+
