@@ -62,7 +62,8 @@ module Game(
 
 	//vga_ctrl
 	reg [23:0] vga_data;
-	wire [9:0] h_addr,v_addr;
+	wire [9:0] h_addr;
+	wire [9:0] v_addr;
 
 
 	//wire en;  //字符显存写入使能端
@@ -74,7 +75,7 @@ module Game(
 	
 	
 	//other
-	reg [8:0] offset[639:0]; //行偏移量
+	reg [9:0] offset[639:0]; //行偏移量
 	reg [3:0] speed[639:0];  //速度
 	reg [9:0] h_offset;  //字符内列信息，防止溢出故设为10位
 	reg [3:0] v_offset;  //字符内行信息
@@ -82,6 +83,13 @@ module Game(
 	reg [11:0] charIndex;  //当前字符索引
 
 	wire moveable;  //每隔一定周期让字符下滑
+	
+	initial begin
+		h_offset=10'd0;
+		v_offset=4'd0;
+		columnTable=639'b0;
+		charIndex=12'b0;
+	end
 	
 	//生成vga_clk
 	clkgen #(25000000) my_vgaclk(
@@ -154,8 +162,8 @@ module Game(
 	end
 	
 	always @ (posedge VGA_CLK) begin   //获取字符内行信息
-		if(v_addr>=offset[charIndex]&&offset[charIndex]+4'd15>=v_addr) begin   
-			v_offset<=v_addr-offset[charIndex];
+		if(v_addr>=offset[charIndex][9:0]&&offset[charIndex][9:0]+4'd15>=v_addr) begin   
+			v_offset<=v_addr-offset[charIndex][9:0];
 		end
 		else begin	
 			v_offset<=4'b0;
@@ -163,34 +171,35 @@ module Game(
 	end
 	
 	
-	always @ (posedge moveable or posedge generator_clk) begin  //字符下滑
+	always @ (posedge moveable) begin  //字符下滑
 		if(generator_clk)begin  //生成字符，设置offset和speed；TODO:可能会覆盖，待修改
-			offset[tmp_y][8:0]<=tmp_x;
+			columnTable[tmp_y]<=1'b1;
+			offset[tmp_y][9:0]<=tmp_x;
 			speed[tmp_y][3:0]<=tmp_speed;
-			if(h_offset==4'b0&&v_addr==offset[charIndex])begin
-				offset[charIndex]<=offset[charIndex]+speed[charIndex];
+			if(h_offset==4'b0&&v_addr==offset[charIndex][9:0])begin
+				offset[charIndex][9:0]<=offset[charIndex][9:0]+speed[charIndex][3:0];
 			end
 			else begin
-				offset[charIndex]<=offset[charIndex];
+				offset[charIndex][9:0]<=offset[charIndex][9:0];
 			end
 		end
 		else begin 
-			if(h_offset==4'b0&&v_addr==offset[charIndex])begin
-				offset[charIndex]<=offset[charIndex]+speed[charIndex];
+			if(h_offset==4'b0&&v_addr==offset[charIndex][9:0])begin
+				offset[charIndex][9:0]<=offset[charIndex][9:0]+speed[charIndex][3:0];
 			end
 			else begin
-				offset[charIndex]<=offset[charIndex];
+				offset[charIndex][9:0]<=offset[charIndex][9:0];
 			end
-		end
+		end 
 	end
 	
 	
 	always @ (posedge VGA_CLK) begin   //设置vga_data，显示
 			if((color_bit>>h_offset)&12'h001 == 1'b1)begin  //取出的一位bit信息为1 
-				vga_data = 24'hffffff;  //white
+				vga_data = 24'h000000; 
 			end
 			else begin
-				vga_data = 24'h000000;  //black
+				vga_data = 24'hffffff;
 			end
 	end
 
