@@ -140,7 +140,7 @@ module Game(
 		.rdaddress(outaddr),
 		.rdclock(VGA_CLK),
 		.wraddress(inaddr),
-		.wrclock(VGA_CLK),
+		.wrclock(CLOCK2_50),
 		.wren(asc_wren),
 		.q(get_asc)
 	); 
