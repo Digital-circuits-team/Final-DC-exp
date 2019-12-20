@@ -46,15 +46,7 @@ module Game(
 
 
 );
-	parameter white = 24'hFFFFFF;
-	parameter black = 24'h000000;
 
-	parameter WEL_STATE = 2'd0;
-	parameter PLAY_STATE =2'd1;
-	parameter END_STATE = 2'd2;
-	
-	reg [1:0] state; 
-	
 	//out_clk
 	wire generator_clk;
 	
@@ -70,7 +62,8 @@ module Game(
 
 	//vga_ctrl
 	reg [23:0] vga_data;
-	wire [9:0] h_addr,v_addr;
+	wire [9:0] h_addr;
+	wire [9:0] v_addr;
 
 
 	//wire en;  //字符显存写入使能端
@@ -81,23 +74,20 @@ module Game(
 	wire [7:0] get_asc; //从字符显存中读取到的ASCII码（8位）
 	wire [11:0] get_asc_12bit;
 	
+	reg flag;
 	//other
-	reg [8:0] offset[639:0]; //行偏移量
+	reg [9:0] offset[639:0]; //行偏移量
 	reg [3:0] speed[639:0];  //速度
 	reg [9:0] h_offset;  //字符内列信息，防止溢出故设为10位
 	reg [3:0] v_offset;  //字符内行信息
 	reg [639:0] columnTable;  //判断某一列是否有字符
-	reg [11:0] charIndex;  //当前字符索引
-	//wire colInfo;//标志当前列是否存在字符
-	
+	reg [9:0] charIndex;  //当前字符索引
+
 	reg [18:0] countclk;
 	reg [5:0] count;
 	reg moveable;  //每隔一定周期让字符下滑
 	
-	
-	//初始化
 	initial begin
-		state = WEL_STATE;
 		count=6'd0;
 		countclk=19'd0;
 		moveable=1'b0;
@@ -105,10 +95,8 @@ module Game(
 		v_offset=4'd0;
 		columnTable=640'b0;
 		flag=1'b0;
-	
 	end
-	
-	
+
 	//生成vga_clk
 	clkgen #(25000000) my_vgaclk(
 		.clkin(CLOCK_50), 
@@ -123,13 +111,12 @@ module Game(
 		.clken(1'b1), 
 		.clkout(generator_clk) 
 	);
-	
 	//随机生成字符
 	Generator gen(.clk(generator_clk),.ch(char),.speed(tmp_speed),.x(tmp_x),.y(tmp_y));
 
 	//点阵ROM，取出字模信息color_bit
 	Lattice_ROM lat_rom(.clk(CLOCK_50), .outaddr(rom_outaddr), .dout(color_bit)); 
-	
+
 	ascii_ram ram(  //字符显存，写入char/读出get_asc
 		.data(char),
 		.rdaddress(outaddr),
@@ -139,16 +126,6 @@ module Game(
 		.wren(1'b1),
 		.q(get_asc)
 		); 
-
-	columnTable mycols(
-		.data(1'b1),
-		.rdaddress(h_addr),
-		.rdclock(VGA_CLK),
-		.wraddress(tmp_y),
-		.wrclock(generator_clk), //future bug:这里将可能出现冲突：当键盘消除字符时要对columnTable进行修改。需要对写时钟和写使能进行调整
-		.wren(1'b1),
-		.q(colInfo)
-	);	
 	
 	vga_ctrl my_vga_ctrl( 
 		.pclk(VGA_CLK), //25MHz时钟 
@@ -187,8 +164,7 @@ module Game(
 		end
 	end
 	
-	
-	always @ (posedge VGA_CLK) begin   //获取字符内列信息
+	always @ (posedge VGA_CLK) begin   //获取字符内列信息,no problem
 		if(columnTable[h_addr] == 1'b1) begin  //当前扫描处有新的字符
 			charIndex=h_addr;
 			h_offset=10'd0;
@@ -210,54 +186,32 @@ module Game(
 		end
 	end
 	
-	always @ (posedge moveable or posedge generator_clk) begin  //字符下滑
+	
+	always @ (posedge VGA_CLK) begin  //字符产生及下滑
 		if(generator_clk)begin  //生成字符，设置offset和speed；TODO:可能会覆盖，待修改
 			offset[tmp_y][8:0]<=tmp_x;
 			speed[tmp_y][3:0]<=tmp_speed;
-			//columnTable[tmp_y]=1'b1;
+			columnTable[tmp_y]<=1'b1;
 			if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
 			end
 			else begin offset[charIndex]<=offset[charIndex]; end
 		end
-		else begin 
+		else begin
 			if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
 			end
 			else begin offset[charIndex]<=offset[charIndex]; end
 		end
 	end
-	
 	
 	always @ (posedge VGA_CLK) begin   //设置vga_data，显示
-			/*界面状态机
-			case(state)
-				WEL_STATE: data <= ;
-				PLAY_STATE:     //游戏状态
-				begin
-					if((color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
-						vga_data = white;  //white
-					else 
-						vga_data = black;  //black				
-				end
-				END_STATE: data <= ;
-			endcase
-			*/
-			
-			if((color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
-				vga_data = white;  //white
-			else 
-				vga_data = black;  //black			
-
+			if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 1'b1)begin  //取出的一位bit信息为1 
+				vga_data = 24'hffffff;  //black
+			end
+			else begin
+				vga_data = 24'h000000;
+			end
 	end
-	
-	always @ (posedge KEY[0]) begin //状态转换
-		if(state==END_STATE)
-			state <= WEL_STATE;
-		else
-			state <= state + 2'd1;		
-	end
-	
-	
 
 endmodule 
