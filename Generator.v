@@ -4,10 +4,12 @@ module Generator(clk,ch,speed,x,y);
     output [2:0] speed;
 	 output [8:0] x;
     output [9:0] y;
-
+	
 	 wire [11:0] ran_y;
 	 wire [7:0] ran_ch;
 	 wire [7:0] ran_speed;
+	 
+	 reg fake;
 	 
     random8 #(2) random_speed(
         .clk(clk),
@@ -28,9 +30,10 @@ module Generator(clk,ch,speed,x,y);
     assign y = ran_y%70*9 ;  
    
 	 assign x = 9'd0;
-
-	 assign ch = 8'd65+ran_ch%26;
 	 
-	 assign speed = ran_speed%2 + 1;
+	 assign fake = ran_ch==8||ran_ch==18||ran_ch==14||ran_ch==19;
+	 assign ch = 8'd65 + ran_ch%26 + fake;
+	 
+	 assign speed = ran_speed%3 + 1;
 
 endmodule 
