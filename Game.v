@@ -121,9 +121,9 @@ module Game(
 	);
 	//随机生成字符
 	Generator gen(.clk(generator_clk),.ch(char),.speed(tmp_speed),.x(tmp_x),.y(tmp_y));
-	hex_decoder(generator_clk,char,{HEX3,HEX2});
-	hex_decoder(generator_clk,tmp_speed,{HEX1,HEX0});
-	
+	hex_decoder(1'b1,char,{HEX1,HEX0});
+	hex_decoder(1'b1,tmp_y[7:0],{HEX3,HEX2});
+	hex_decoder(1'b1,{6'd0,tmp_y[9:8]},{HEX5,HEX4});
 	//点阵ROM，取出字模信息color_bit
 	Lattice_ROM lat_rom(.clk(CLOCK_50), .outaddr(rom_outaddr), .dout(color_bit)); 
 	
