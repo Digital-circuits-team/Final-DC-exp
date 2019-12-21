@@ -29,7 +29,7 @@ module Generator(clk,ch,speed,x,y);
    
 	 assign x = 9'd0;
 
-	 assign ch = 8'd97+ran_ch%26;
+	 assign ch = 8'd65+ran_ch%26;
 	 
 	 assign speed = ran_speed%4 + 1;
 
