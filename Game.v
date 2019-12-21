@@ -104,7 +104,7 @@ module Game(
 	reg remove_flag;
 	
 	reg [7:0] score;//分数
-	
+	reg [7:0] fps;//帧率
 	//state contrl
 	wire [19:0] addr;
 	wire [11:0] wel_data;
@@ -117,7 +117,8 @@ module Game(
 	initial begin
 		reset=1'b0;
 		clk_en=1'b0;
-		
+		fps=8'd0;
+		state=2'd0;
 		gameover=1'b0;
 		count=6'd0;
 		countclk=19'd0;
@@ -323,7 +324,7 @@ module Game(
 
 		endcase
 	end
-	
+	/**/
 	
 	//计算图片地址
 	assign addr = h_addr<<9|(v_addr&9'b111111111);
@@ -333,6 +334,15 @@ module Game(
 	
 	//结束界面
 	//endROM gameend(addr,VGA_CLK,end_data);
+	
+	//计算帧率
+	always @ (posedge dis_clk) begin
+		if(generator_clk)
+			fps<=8'd0;
+		else
+			fps<=fps+8'd1;
+	end
+	
 	
 	
 endmodule 
