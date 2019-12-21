@@ -26,7 +26,7 @@ module Generator(clk,ch,speed,x,y);
 	 );
 	
     assign y_in_70 = ran_y&10'h3f+{8'd0,ran_y[7:6]}+{8'd0,ran_y[9:8]};  
-	 assign y = y_in_70<<1+y_in_70<<3;
+	 assign y = y_in_70+y_in_70<<3;
    
 	 assign x = 9'd0;
 
