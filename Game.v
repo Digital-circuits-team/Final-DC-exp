@@ -88,7 +88,7 @@ module Game(
 	reg [9:0] charIndex;  //当前字符索引
 
 	reg [18:0] countclk;
-	reg [6:0] count;
+	reg [7:0] count;
 	reg moveable;  //每隔一定周期让字符下滑
 	
 	reg gameover; //游戏结束标志
@@ -113,7 +113,7 @@ module Game(
 		.clkout(VGA_CLK) 
 	);
 	//用于随机生成字符的时钟
-	clkgen #(1) my_generator_clk(
+	clkgen #(2) my_generator_clk(
 		.clkin(CLOCK_50), 
 		.rst(SW[0]), 
 		.clken(1'b1), 
@@ -121,11 +121,13 @@ module Game(
 	);
 	//随机生成字符
 	Generator gen(.clk(generator_clk),.ch(char),.speed(tmp_speed),.x(tmp_x),.y(tmp_y));
+	hex_decoder(generator_clk,char,{HEX3,HEX2});
+	hex_decoder(generator_clk,tmp_speed,{HEX1,HEX0});
 	
 	//点阵ROM，取出字模信息color_bit
 	Lattice_ROM lat_rom(.clk(CLOCK_50), .outaddr(rom_outaddr), .dout(color_bit)); 
 	
-	hex_decoder mychar(1'b1,char,{HEX1,HEX0});
+	//hex_decoder mychar(1'b1,char,{HEX1,HEX0});
 	
 	
 	//TODO: assign addr
@@ -167,7 +169,7 @@ module Game(
 			count=count+6'd1;
 			countclk=19'd0;
 		end
-		if(count==6'd2)begin
+		if(count==6'd1)begin
 			count=6'd0;
 			moveable=1'b1;
 		end
@@ -232,7 +234,7 @@ module Game(
 	end
 	
 	always @ (posedge VGA_CLK) begin   //设置vga_data，显示
-			if(flag==1'b1&&h_offset<=10'd8&&(color_bit>>h_offset)&12'h001 == 1'b1)begin  //取出的一位bit信息为1 
+			if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 1'b1)begin  //取出的一位bit信息为1 
 				vga_data = black;  //black
 			end
 			else begin
