@@ -51,6 +51,12 @@ module Game(
 	parameter white = 24'hFFFFFF;
 	parameter black = 24'h000000;
 	
+	parameter WEL_STATE = 2'd0;
+	parameter PLAY_STATE =2'd1;
+	parameter END_STATE = 2'd2;
+	
+	reg [1:0] state; 
+		
 	//out_clk
 	wire generator_clk;
 	
@@ -97,6 +103,8 @@ module Game(
 	
 	reg remove_flag;
 	
+	reg [7:0] score;//分数
+	
 	initial begin
 		gameover=1'b0;
 		count=6'd0;
@@ -125,10 +133,9 @@ module Game(
 	);
 	//随机生成字符
 	Generator gen(.clk(generator_clk),.ch(char),.speed(tmp_speed),.x(tmp_x),.y(tmp_y));
-	hex_decoder a(generator_clk,get_asc,{HEX3,HEX2});
-	hex_decoder s(generator_clk,char,{HEX1,HEX0});
-	
-	hex_decoder x(CLOCK_50,press,{HEX5,HEX4});
+	//hex_decoder a(generator_clk,get_asc,{HEX3,HEX2});
+	hex_decoder s(1'b1,score,{HEX1,HEX0});
+
 	
 	//点阵ROM，取出字模信息color_bit
 	Lattice_ROM lat_rom(.clk(CLOCK_50), .outaddr(rom_outaddr), .dout(color_bit)); 
@@ -209,7 +216,7 @@ module Game(
 	
 	
 	always @ (posedge VGA_CLK) begin  //字符产生及下滑
-		if(generator_clk)begin  //生成字符，设置offset和speed；TODO:可能会覆盖，待修改
+		if(generator_clk)begin  //生成字符，设置offset和speed
 			offset[tmp_y][8:0]<=tmp_x;
 			speed[tmp_y][2:0]<=tmp_speed;
 			columnTable[tmp_y]<=1'b1;
@@ -220,6 +227,8 @@ module Game(
 				offset[charIndex]<=10'd520;
 				columnTable[charIndex]<=1'b0;
 				remove_flag<=1'b0;
+				//计分
+				score <= score + 8d'1;
 			end
 			else if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin  //该字符没有被消除，继续字符下滑
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
@@ -227,22 +236,65 @@ module Game(
 				if(offset[charIndex]>=lower_bound&&offset[charIndex]<=another_bound) begin
 					gameover <= 1'b1;
 					//临时擦除字符试验
+					/*
 					speed[charIndex]<=3'd0;
 					offset[charIndex]<=10'd520;
 					columnTable[charIndex]<=1'b0;
+					*/
 				end
 			end
 			else begin offset[charIndex]<=offset[charIndex]; end
 	end
 	
 	always @ (posedge VGA_CLK) begin   //设置vga_data，显示
-			if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 1'b1)begin  //取出的一位bit信息为1 
-				vga_data = white;  //black
-			end
-			else begin
-				vga_data = black;
-			end
+			//界面状态机
+			case(state)
+				WEL_STATE: data <= wel_data;
+				PLAY_STATE:     //游戏状态
+				begin
+					if((color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
+						vga_data = white;  //white
+					else 
+						vga_data = black;  //black				
+				end
+				END_STATE: data <= end_data;
+			endcase
+			
+/*			
+			if((color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
+				vga_data = white;  //white
+			else 
+				vga_data = black;  //black			
+*/
 	end
-
+	
+	
 	assign LEDR[0]=gameover;
+	
+	always @ (posedge KEY[0]) begin //状态转换
+		case(state)
+			WEL_STATE:begin
+				
+			end
+			PLAY_STATE:begin
+			
+			end
+			END_STATE:begin
+				
+			end
+
+		endcase
+	end
+	
+	
+	//计算图片地址
+	assign addr = h_addr<<9|(v_addr&9'b111111111);
+	
+	//欢迎界面
+	welROM welcome(addr,VGA_CLK,wel_data);
+	
+	//结束界面
+	endROM gameend(addr,VGA_CLK,end_data);
+	
+	
 endmodule 
