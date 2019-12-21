@@ -47,6 +47,7 @@ module Game(
 
 );
 	parameter lower_bound = 10'd480;
+	parameter another_bound = 10'd500;
 	parameter white = 24'hFFFFFF;
 	parameter black = 24'h000000;
 	
@@ -55,7 +56,7 @@ module Game(
 	
 	//Generator
 	wire [7:0]char;
-	wire [3:0]tmp_speed;
+	wire [2:0]tmp_speed;
 	wire [8:0]tmp_x;
 	wire [9:0]tmp_y;
 	
@@ -80,7 +81,7 @@ module Game(
 	reg flag;
 	//other
 	reg [9:0] offset[639:0]; //行偏移量
-	reg [3:0] speed[639:0];  //速度
+	reg [2:0] speed[639:0];  //速度
 	reg [9:0] h_offset;  //字符内列信息，防止溢出故设为10位
 	reg [3:0] v_offset;  //字符内行信息
 	reg [639:0] columnTable;  //判断某一列是否有字符
@@ -91,14 +92,9 @@ module Game(
 	reg moveable;  //每隔一定周期让字符下滑
 	
 	reg gameover; //游戏结束标志
-	reg w_signal; //字符消除信号
-	wire [7:0] in_char; //写入字符
-	wire asc_wren;//字符显存写使能
 	
 	
 	initial begin
-		
-		w_signal=1'b0;
 		gameover=1'b0;
 		count=6'd0;
 		countclk=19'd0;
@@ -129,19 +125,17 @@ module Game(
 	//点阵ROM，取出字模信息color_bit
 	Lattice_ROM lat_rom(.clk(CLOCK_50), .outaddr(rom_outaddr), .dout(color_bit)); 
 	
-	hex_decoder mychar(1'b1,in_char,{HEX1,HEX0});
+	hex_decoder mychar(1'b1,char,{HEX1,HEX0});
 	
 	
 	//TODO: assign addr
-	assign in_char = (w_signal&1'b1)?8'd32:char;
-	assign asc_wren = generator_clk|w_signal; //字符显存写使能
 	ascii_ram ram(  //字符显存，写入char/读出get_asc
-		.data(in_char),
+		.data(char),
 		.rdaddress(outaddr),
 		.rdclock(VGA_CLK),
 		.wraddress(inaddr),
-		.wrclock(CLOCK2_50),
-		.wren(asc_wren),
+		.wrclock(generator_clk),
+		.wren(1'b1),
 		.q(get_asc)
 	); 
 	
@@ -206,18 +200,17 @@ module Game(
 	
 	
 	always @ (posedge VGA_CLK) begin  //字符产生及下滑
-	w_signal<=1'b0;//可能w_signal的赋值方式会产生冲突
 		if(generator_clk)begin  //生成字符，设置offset和speed；TODO:可能会覆盖，待修改
 			offset[tmp_y][8:0]<=tmp_x;
-			speed[tmp_y][3:0]<=tmp_speed;
+			speed[tmp_y][2:0]<=tmp_speed;
 			columnTable[tmp_y]<=1'b1;
 			if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
-				if(offset[charIndex]>=lower_bound) begin
+				if(offset[charIndex]>=lower_bound&&offset[charIndex]<=another_bound) begin
 					gameover <= 1'b1;
-					speed[charIndex]<=4'd0;
+					speed[charIndex]<=3'd0;
 					offset[charIndex]<=10'd0;
-					w_signal <= 1'b1;
+					columnTable[charIndex]<=1'b0;
 				end
 			end
 			else begin offset[charIndex]<=offset[charIndex]; end
@@ -225,12 +218,12 @@ module Game(
 		else begin
 			if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
-				if(offset[charIndex]>=lower_bound) begin
+				if(offset[charIndex]>=lower_bound&&offset[charIndex]<=another_bound) begin
 					gameover <= 1'b1;
 					//临时擦除字符试验
-					speed[charIndex]<=4'd0;
-					offset[charIndex]<=10'd0;
-					w_signal <= 1'b1;
+					speed[charIndex]<=3'd0;
+					offset[charIndex]<=10'd520;
+					columnTable[charIndex]<=1'b0;
 				end
 			end
 			else begin offset[charIndex]<=offset[charIndex]; end

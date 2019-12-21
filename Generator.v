@@ -1,7 +1,7 @@
 module Generator(clk,ch,speed,x,y);
     input clk;
 	 output [7:0] ch;
-    output [3:0] speed;
+    output [2:0] speed;
 	 output [8:0] x;
     output [9:0] y;
 
