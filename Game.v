@@ -88,7 +88,7 @@ module Game(
 	reg [9:0] charIndex;  //当前字符索引
 
 	reg [18:0] countclk;
-	reg [7:0] count;
+	reg [5:0] count;
 	reg moveable;  //每隔一定周期让字符下滑
 	
 	reg gameover; //游戏结束标志
