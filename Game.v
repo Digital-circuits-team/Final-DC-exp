@@ -208,6 +208,7 @@ module Game(
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
 				if(offset[charIndex]>=lower_bound&&offset[charIndex]<=another_bound) begin
 					gameover <= 1'b1;
+					//临时擦除字符试验
 					speed[charIndex]<=3'd0;
 					offset[charIndex]<=10'd520;
 					columnTable[charIndex]<=1'b0;
