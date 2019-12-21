@@ -78,6 +78,9 @@ module Game(
 	wire [7:0] get_asc; //从字符显存中读取到的ASCII码（8位）
 	wire [11:0] get_asc_12bit;
 	
+	//FSM
+	wire [7:0] press;  //键盘按键
+	
 	reg flag;
 	//other
 	reg [9:0] offset[639:0]; //行偏移量
@@ -86,13 +89,13 @@ module Game(
 	reg [3:0] v_offset;  //字符内行信息
 	reg [639:0] columnTable;  //判断某一列是否有字符
 	reg [9:0] charIndex;  //当前字符索引
-
 	reg [18:0] countclk;
 	reg [5:0] count;
 	reg moveable;  //每隔一定周期让字符下滑
 	
 	reg gameover; //游戏结束标志
 	
+	reg remove_flag;
 	
 	initial begin
 		gameover=1'b0;
@@ -103,6 +106,7 @@ module Game(
 		v_offset=4'd0;
 		columnTable=640'b0;
 		flag=1'b0;
+		remove_flag=1'b0;
 	end
 
 	//生成vga_clk
@@ -121,16 +125,15 @@ module Game(
 	);
 	//随机生成字符
 	Generator gen(.clk(generator_clk),.ch(char),.speed(tmp_speed),.x(tmp_x),.y(tmp_y));
-	hex_decoder(generator_clk,char,{HEX3,HEX2});
-	hex_decoder(generator_clk,tmp_speed,{HEX1,HEX0});
+	hex_decoder a(generator_clk,get_asc,{HEX3,HEX2});
+	hex_decoder s(generator_clk,char,{HEX1,HEX0});
+	
+	hex_decoder x(CLOCK_50,press,{HEX5,HEX4});
 	
 	//点阵ROM，取出字模信息color_bit
 	Lattice_ROM lat_rom(.clk(CLOCK_50), .outaddr(rom_outaddr), .dout(color_bit)); 
 	
-	//hex_decoder mychar(1'b1,char,{HEX1,HEX0});
 	
-	
-	//TODO: assign addr
 	ascii_ram ram(  //字符显存，写入char/读出get_asc
 		.data(char),
 		.rdaddress(outaddr),
@@ -156,6 +159,10 @@ module Game(
 	); 
 	assign VGA_SYNC_N = 0;
 
+	//键盘模块
+	FSM keyboard(.clk(CLOCK_50),.ps2_clk(PS2_CLK),.ps2_data(PS2_DAT),.ascii(press));
+	
+	
 	assign inaddr=tmp_y;
 	assign outaddr=charIndex; //依据outaddr查询字符RAM
 	
@@ -206,8 +213,17 @@ module Game(
 			offset[tmp_y][8:0]<=tmp_x;
 			speed[tmp_y][2:0]<=tmp_speed;
 			columnTable[tmp_y]<=1'b1;
-			if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin
+		end
+		else begin end
+		if(remove_flag==1'b1&&get_asc==press)begin  //字符消除
+				speed[charIndex]<=3'd0;
+				offset[charIndex]<=10'd520;
+				columnTable[charIndex]<=1'b0;
+				remove_flag<=1'b0;
+			end
+			else if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin  //该字符没有被消除，继续字符下滑
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
+				if(press==8'h31)begin remove_flag<=1'b1; end  //松开按键，准备消除下一个字符
 				if(offset[charIndex]>=lower_bound&&offset[charIndex]<=another_bound) begin
 					gameover <= 1'b1;
 					//临时擦除字符试验
@@ -217,28 +233,14 @@ module Game(
 				end
 			end
 			else begin offset[charIndex]<=offset[charIndex]; end
-		end
-		else begin
-			if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin
-				offset[charIndex]<=offset[charIndex]+speed[charIndex];
-				if(offset[charIndex]>=lower_bound&&offset[charIndex]<=another_bound) begin
-					gameover <= 1'b1;
-					//临时擦除字符试验
-					speed[charIndex]<=3'd0;
-					offset[charIndex]<=10'd520;
-					columnTable[charIndex]<=1'b0;
-				end
-			end
-			else begin offset[charIndex]<=offset[charIndex]; end
-		end
 	end
 	
 	always @ (posedge VGA_CLK) begin   //设置vga_data，显示
 			if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 1'b1)begin  //取出的一位bit信息为1 
-				vga_data = black;  //black
+				vga_data = white;  //black
 			end
 			else begin
-				vga_data = white;
+				vga_data = black;
 			end
 	end
 
