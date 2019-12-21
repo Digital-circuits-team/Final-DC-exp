@@ -88,7 +88,7 @@ module Game(
 	reg [9:0] charIndex;  //当前字符索引
 
 	reg [18:0] countclk;
-	reg [7:0] count;
+	reg [5:0] count;
 	reg moveable;  //每隔一定周期让字符下滑
 	
 	reg gameover; //游戏结束标志
@@ -169,7 +169,7 @@ module Game(
 			count=count+6'd1;
 			countclk=19'd0;
 		end
-		if(count==6'd1)begin
+		if(count==6'd2)begin
 			count=6'd0;
 			moveable=1'b1;
 		end
@@ -180,12 +180,12 @@ module Game(
 	
 	always @ (posedge VGA_CLK) begin   //获取字符内列信息,no problem
 		if(columnTable[h_addr] == 1'b1) begin  //当前扫描处有新的字符
-			charIndex=h_addr;
-			h_offset=10'd0;
+			charIndex<=h_addr;
+			h_offset<=10'd0;
 		end
 		else begin
-			charIndex=charIndex;
-			h_offset=h_offset+10'd1;  //可能溢出
+			charIndex<=charIndex;
+			h_offset<=h_offset+10'd1;  //可能溢出
 		end
 	end
 	
@@ -234,11 +234,11 @@ module Game(
 	end
 	
 	always @ (posedge VGA_CLK) begin   //设置vga_data，显示
-			if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 1'b1)begin  //取出的一位bit信息为1 
-				vga_data = black;  //black
+			if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 12'd1)begin  //取出的一位bit信息为1 
+				vga_data <= white;  //black
 			end
 			else begin
-				vga_data = white;
+				vga_data <= black;
 			end
 	end
 
