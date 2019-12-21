@@ -9,7 +9,7 @@ module Generator(clk,ch,speed,x,y);
 	 wire [7:0] ran_ch;
 	 wire [7:0] ran_speed;
 	 
-	 reg fake;
+	 wire fake;
 	 
     random8 #(2) random_speed(
         .clk(clk),
