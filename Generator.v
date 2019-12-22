@@ -27,7 +27,7 @@ module Generator(clk,ch,speed,x,y);
 	 );
 	
 	 
-    assign y = ran_y%70*9 ;  
+    assign y = 11'hA+(ran_y&11'h3f)*9 ;  
    
 	 assign x = 9'd0;
 	 
