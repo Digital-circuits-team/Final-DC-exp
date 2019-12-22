@@ -323,17 +323,17 @@ module Game(
 					pressing<=1'b0;
 			end
 			PLAY_STATE:begin
-			
+				
 				if(remove_flag==1'b0)begin
 					score<=score+8'd1;
 				end
 				
 				if(gameover) begin
-					pressing<=1'b0;
+					pressing<=1'b1;
 					state <= END_STATE;
 				end
-		
 				
+			
 			end
 			END_STATE:begin
 				if(press==8'd13)begin
@@ -355,7 +355,7 @@ module Game(
 	
 	
 	//计算图片地址
-	assign addr = h_addr<<9|(v_addr&9'b111111111);
+	assign addr = h_addr+v_addr<<9+v_addr<<7;
 	
 	//欢迎界面
 	welROM welcome(addr,VGA_CLK,wel_data);
@@ -420,7 +420,7 @@ module Game(
 			sflag <= 1'b0;
 			
 	end
-	
+	assign LEDR[1]=pressing;
 	Lattice_ROM num_rom(.clk(CLOCK_50), .outaddr(sp_addr), .dout(scolor_bit)); 
 	
 endmodule 
