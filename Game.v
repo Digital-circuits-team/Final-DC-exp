@@ -365,9 +365,10 @@ module Game(
 	clkgen #(1) fpsclk(CLOCK_50,1'b0,1'b1,fpsclk);
 	assign flash_flag = h_addr == 10'd320 && v_addr == 10'd240;
 	always @ (posedge VGA_CLK) begin
-		if(fpsclk)
+		if(fpsclk) begin
 			fps_reg<=fps;
 			fps<=8'd0;
+		end
 		else if(flag)
 			fps<=fps+8'd1;
 		else 
