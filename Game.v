@@ -56,7 +56,7 @@ module Game(
 	parameter END_STATE = 2'd2;
 	
 	reg [1:0] state; 
-		
+	reg score_flag;	
 	//out_clk
 	wire generator_clk;
 	
@@ -130,7 +130,7 @@ module Game(
 		state=2'd0;
 		*/
 		clk_en=1'b1;
-		state=WEL_STATE;
+		state=PLAY_STATE;
 		fps=8'd0;
 		pressing=1'b0;
 		gameover=1'b0;
@@ -208,6 +208,7 @@ module Game(
 		if(countclk==19'd420000)begin
 			count=count+6'd1;
 			countclk=19'd0;
+			fps=fps+8'd1;
 		end
 		if(count==6'd1)begin
 			count=6'd0;
@@ -216,6 +217,8 @@ module Game(
 		else if(countclk==19'd830)begin
 			moveable=1'b0;
 		end
+		
+		if(fpsclk)fps=0;
 	end
 	
 	always @ (posedge VGA_CLK) begin   //获取字符内列信息,no problem
@@ -251,7 +254,8 @@ module Game(
 		if(state==END_STATE) begin //不在游戏状态，将所有变量清空
 			speed[charIndex]<=3'd0;
 			offset[charIndex]<=10'd0;
-			columnTable[charIndex]<=1'b0;			
+			columnTable[charIndex]<=1'b0;	
+			gameover<=1'b0;
 		end
 		else if(remove_flag==1'b1&&get_asc==press)begin  //字符消除
 				speed[charIndex]<=3'd0;
@@ -267,12 +271,14 @@ module Game(
 				if(offset[charIndex]>=lower_bound&&offset[charIndex]<=another_bound) begin
 					gameover <= 1'b1;
 					//临时擦除字符试验
-					/**/
+					/*
 					speed[charIndex]<=3'd0;
 					offset[charIndex]<=10'd520;
 					columnTable[charIndex]<=1'b0;
-					
+					*/
 				end
+				else
+					gameover<=1'b0;
 			end
 			else begin offset[charIndex]<=offset[charIndex]; end
 	end
@@ -324,9 +330,17 @@ module Game(
 			end
 			PLAY_STATE:begin
 				
-				if(remove_flag==1'b0)begin
-					score<=score+8'd1;
+				if(remove_flag==1'b0)begin //解决由于时序导致的积分问题
+					if(score_flag==1'b1) 
+						score_flag<=1'b1;
+					else begin	
+						score<=score+8'd1;
+						score_flag<=1'b1;
+					end
 				end
+				else
+					score_flag<=1'b0;
+				
 				
 				if(gameover) begin
 					pressing<=1'b1;
@@ -353,9 +367,9 @@ module Game(
 		endcase
 	end
 	
-	
+	hex_decoder mystate(1'b1,state,{HEX1,HEX0});
 	//计算图片地址
-	assign addr = h_addr+v_addr<<9+v_addr<<7;
+	assign addr = h_addr+v_addr*640;
 	
 	//欢迎界面
 	welROM welcome(addr,VGA_CLK,wel_data);
@@ -367,17 +381,11 @@ module Game(
 	
 	//计算帧率
 	clkgen #(1) fps_clk(CLOCK_50,1'b0,1'b1,fpsclk);
-	assign flash_flag = h_addr == 10'd320 && v_addr == 10'd240;
-	always @ (posedge VGA_CLK) begin
-		if(fpsclk) begin
-			fps_reg=fps;
-			fps=8'd0;
-		end
-		else if(flash_flag)
-			fps=fps+8'd1;
-		else 
-			fps=fps;
-	end
+	
+	always @ (posedge fpsclk) 
+		fps_reg=fps<<1;
+	
+	hex_decoder fpshex(1'b1,fps_reg,{HEX5,HEX4});
 	
 	assign fps_ten = 8'h30+fps_reg/10;
 	assign fps_one = 8'h30+fps_reg%10;
