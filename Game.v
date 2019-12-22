@@ -99,7 +99,9 @@ module Game(
 	reg flag;
 	//other
 	reg [9:0] offset[639:0]; //行偏移量
-	reg [2:0] speed[639:0];  //速度
+	wire [2:0] speed;  //速度
+	wire [2:0] wirte_speed;
+	reg [2:0] reg_speed;
 	reg [9:0] h_offset;  //字符内列信息，防止溢出故设为10位
 	reg [3:0] v_offset;  //字符内行信息
 	reg [639:0] columnTable;  //判断某一列是否有字符
@@ -153,7 +155,7 @@ module Game(
 	);
 	
 	//用于随机生成字符的时钟
-	clkgen #(2) my_generator_clk(
+	clkgen #(1) my_generator_clk(
 		.clkin(CLOCK_50), 
 		.rst(1'b0), 
 		.clken(clk_en), 
@@ -176,6 +178,16 @@ module Game(
 		.wren(1'b1),
 		.q(get_asc)
 	); 
+	
+	asc_speed sp(  //speed显存，写入wirte_speed/读出speed
+		.clock(VGA_CLK),
+		.data(wirte_speed),
+		.rdaddress(outaddr),
+		.wraddress(inaddr),
+		.wren(generator_clk),
+		.q(speed)
+	);
+	assign wirte_speed=reg_speed;
 	
 	vga_ctrl my_vga_ctrl( 
 		.pclk(VGA_CLK), //25MHz时钟 
@@ -247,18 +259,19 @@ module Game(
 	always @ (posedge VGA_CLK) begin  //字符产生及下滑
 		if(generator_clk)begin  //生成字符，设置offset和speed
 			offset[tmp_y][8:0]<=tmp_x;
-			speed[tmp_y][2:0]<=tmp_speed;
+			reg_speed<=tmp_speed;
 			columnTable[tmp_y]<=1'b1;
 		end
 		else begin end
+
 		if(state!=PLAY_STATE) begin //不在游戏状态，将所有变量清空
-			speed[charIndex]<=3'd0;
+			reg_speed<=3'd0;
 			offset[charIndex]<=10'd0;
 			columnTable[charIndex]<=1'b0;	
 			gameover<=1'b0;
 		end
 		else if(remove_flag==1'b1&&get_asc==press)begin  //字符消除
-				speed[charIndex]<=3'd0;
+				reg_speed<=3'd0;
 				offset[charIndex]<=10'd520;
 				columnTable[charIndex]<=1'b0;
 				remove_flag<=1'b0;
@@ -266,13 +279,15 @@ module Game(
 				//score <= score + 8'd1;
 			end
 			else if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin  //该字符没有被消除，继续字符下滑
-				offset[charIndex]<=offset[charIndex]+speed[charIndex];
+				offset[charIndex]<=offset[charIndex]+speed;
 				if(press==8'h31)begin remove_flag<=1'b1; end  //松开按键，准备消除下一个字符
 				if(offset[charIndex]>=lower_bound&&offset[charIndex]<=another_bound) begin
 					gameover <= 1'b1;
 					//临时擦除字符试验
+
 					/*
 					speed[charIndex]<=3'd0;
+					reg_speed<=3'd0;
 					offset[charIndex]<=10'd520;
 					columnTable[charIndex]<=1'b0;
 					*/
