@@ -120,8 +120,7 @@ module Game(
 	wire [11:0] end_data;
 	reg clk_en;
 	reg reset;
-	//wire dis_clk;
-	
+	reg pressing;
 	wire flash_flag;
 	
 	initial begin
@@ -130,11 +129,10 @@ module Game(
 		clk_en=1'b0;
 		state=2'd0;
 		*/
-		reset=1'b0;
 		clk_en=1'b1;
-		state=PLAY_STATE;
+		state=WEL_STATE;
 		fps=8'd0;
-		
+		pressing=1'b0;
 		gameover=1'b0;
 		count=6'd0;
 		countclk=19'd0;
@@ -154,15 +152,6 @@ module Game(
 		.clkout(VGA_CLK) 
 	);
 	
-	//生成dis_clk
-	/*
-	clkgen #(25000000) my_disclk(
-		.clkin(CLOCK_50), 
-		.rst(reset), 
-		.clken(clk_en), 
-		.clkout(dis_clk) 
-	);
-	*/
 	//用于随机生成字符的时钟
 	clkgen #(2) my_generator_clk(
 		.clkin(CLOCK_50), 
@@ -172,7 +161,6 @@ module Game(
 	);
 	//随机生成字符
 	Generator gen(.clk(generator_clk),.ch(char),.speed(tmp_speed),.x(tmp_x),.y(tmp_y));
-	//hex_decoder s(1'b1,score,{HEX1,HEX0});
 
 	
 	//点阵ROM，取出字模信息color_bit
@@ -260,7 +248,7 @@ module Game(
 			columnTable[tmp_y]<=1'b1;
 		end
 		else begin end
-		if(state!=PLAY_STATE) begin //不在游戏状态，将所有变量清空
+		if(state==END_STATE) begin //不在游戏状态，将所有变量清空
 			speed[charIndex]<=3'd0;
 			offset[charIndex]<=10'd0;
 			columnTable[charIndex]<=1'b0;			
@@ -270,8 +258,8 @@ module Game(
 				offset[charIndex]<=10'd520;
 				columnTable[charIndex]<=1'b0;
 				remove_flag<=1'b0;
-				//计分
-				score <= score + 8'd1;
+				//计分(已转移至状态机中)
+				//score <= score + 8'd1;
 			end
 			else if(moveable==1'b1&&h_offset==10'd0&&v_addr==10'd0)begin  //该字符没有被消除，继续字符下滑
 				offset[charIndex]<=offset[charIndex]+speed[charIndex];
@@ -290,65 +278,77 @@ module Game(
 	end
 	
 	always @ (posedge VGA_CLK) begin   //设置vga_data，显示
-			/*/界面状态机
+			//界面状态机
 			case(state)
 				WEL_STATE: vga_data <= 24'hff00ff;
 							//vga_data <= wel_data[11:8] << 20 | wel_data[7:4] << 12 | wel_data[3:0] << 4;
 				PLAY_STATE:     //游戏状态
 				begin
-					if((color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
+					if(sflag==1'b1&&(scolor_bit>>sh_offset)&12'h001 == 1'b1) //显示帧率和分数
+						vga_data <= 24'hff00ff;
+					else if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
 						vga_data <= white;  //white
 					else 
-						vga_data <= black;  //black				
+						vga_data <= black;  //black					
 				end
 				END_STATE: vga_data <= 24'h00ffff; 
 							//vga_data <= end_data[11:8] << 20 | end_data[7:4] << 12 | end_data[3:0] << 4;
 			endcase
-			*/
-			if(sflag==1'b1&&(scolor_bit>>sh_offset)&12'h001 == 1'b1) //显示帧率和分数
-				vga_data <= 24'hff00ff;
- 			else if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
-				vga_data <= white;  //white
-			else 
-				vga_data <= black;  //black			
-
 	end
 	
 	
 	assign LEDR[0]=gameover;
 	
 	
-	/*
-	always @ (posedge CLOCK_50) begin //状态转换
+	
+	always @ (posedge VGA_CLK) begin //状态转换
 		case(state)
 			WEL_STATE:begin
 			
 				if(press==8'd13) begin
-					clk_en <= 1'b1;
-					reset <= 1'b0;
-					state <= PLAY_STATE;
-					
+					if(pressing)begin
+						pressing<=1'b1;
+					end
+					else begin
+						pressing<=1'b1;
+						score<=8'd0;
+						state<=PLAY_STATE;//到下一个状态
+					end
 				end
+				else
+					pressing<=1'b0;
 			end
 			PLAY_STATE:begin
-				//考虑把score的更新移到这里
-								
-				if(gameover) begin
-					reset <= 1'b1;
-					state <= END_STATE;
-
+			
+				if(remove_flag==1'b0)begin
+					score<=score+8'd1;
 				end
+				
+				if(gameover) begin
+					pressing<=1'b0;
+					state <= END_STATE;
+				end
+				
 			end
 			END_STATE:begin
-				clk_en <= 1'b0;
-				if(press==8'd13)
-					state <= WEL_STATE;
+				if(press==8'd13)begin
+					if(pressing)begin
+						pressing<=1'b1;
+					end
+					else begin
+						pressing<=1'b1;
+					
+						state <= WEL_STATE;
+					end
+				end
+				else
+					pressing<=1'b0;
 					
 			end
 
 		endcase
 	end
-	*/
+	
 	
 	//计算图片地址
 	//assign addr = h_addr<<9|(v_addr&9'b111111111);
@@ -366,13 +366,13 @@ module Game(
 	assign flash_flag = h_addr == 10'd320 && v_addr == 10'd240;
 	always @ (posedge VGA_CLK) begin
 		if(fpsclk) begin
-			fps_reg<=fps;
-			fps<=8'd0;
+			fps_reg=fps;
+			fps=8'd0;
 		end
-		else if(flag)
-			fps<=fps+8'd1;
+		else if(flash_flag)
+			fps=fps+8'd1;
 		else 
-			fps<=fps;
+			fps=fps;
 	end
 	
 	assign fps_ten = 8'h30+fps_reg/10;
@@ -380,13 +380,6 @@ module Game(
 	
 	assign score_ten = 8'h30+score/10;
 	assign score_one = 8'h30+score%10;
-	
-	/*
-	assign fps_one = 8'h31;
-	assign fps_ten = 8'h32;
-	assign score_one = 8'h33;
-	assign score_ten = 8'h34;
-	*/
 	
 	
 	always @ (posedge VGA_CLK) begin  //分数和帧率显示的地址处理
