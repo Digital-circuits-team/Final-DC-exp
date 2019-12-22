@@ -91,7 +91,7 @@ module Game(
 	reg sflag;				//是否处在特殊显示区域
 	reg [9:0] sh_offset;//列偏移量
 	reg [11:0] sp_addr;
-	
+	wire fpsclk;
 	
 	//FSM
 	wire [7:0] press;  //键盘按键
