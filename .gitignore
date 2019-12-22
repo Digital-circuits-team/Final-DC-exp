@@ -2,7 +2,7 @@
 db/
 incremental_db/
 output_files/
-!/Game.sof
+!/*.sof
 !/*.v
 !README.md
 !/*.txt
