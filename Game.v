@@ -84,6 +84,15 @@ module Game(
 	wire [7:0] get_asc; //从字符显存中读取到的ASCII码（8位）
 	wire [11:0] get_asc_12bit;
 	
+	//special display 帧率和分数
+	wire [11:0] scolor_bit;	
+	wire [7:0] fps_ten,fps_one;
+	wire [7:0] score_ten,score_one;
+	reg sflag;				//是否处在特殊显示区域
+	reg [9:0] sh_offset;//列偏移量
+	reg [11:0] sp_addr;
+	
+	
 	//FSM
 	wire [7:0] press;  //键盘按键
 	
@@ -115,10 +124,16 @@ module Game(
 
 	
 	initial begin
+	/*
 		reset=1'b0;
 		clk_en=1'b0;
-		fps=8'd0;
 		state=2'd0;
+		*/
+		reset=1'b0;
+		clk_en=1'b1;
+		state=2'd1;
+		fps=8'd0;
+		
 		gameover=1'b0;
 		count=6'd0;
 		countclk=19'd0;
@@ -258,18 +273,18 @@ module Game(
 				if(offset[charIndex]>=lower_bound&&offset[charIndex]<=another_bound) begin
 					gameover <= 1'b1;
 					//临时擦除字符试验
-					/*
+					/**/
 					speed[charIndex]<=3'd0;
 					offset[charIndex]<=10'd520;
 					columnTable[charIndex]<=1'b0;
-					*/
+					
 				end
 			end
 			else begin offset[charIndex]<=offset[charIndex]; end
 	end
 	
 	always @ (posedge VGA_CLK) begin   //设置vga_data，显示
-			//界面状态机
+			/*/界面状态机
 			case(state)
 				WEL_STATE: vga_data <= 24'hff00ff;
 							//vga_data <= wel_data[11:8] << 20 | wel_data[7:4] << 12 | wel_data[3:0] << 4;
@@ -283,18 +298,21 @@ module Game(
 				END_STATE: vga_data <= 24'h00ffff; 
 							//vga_data <= end_data[11:8] << 20 | end_data[7:4] << 12 | end_data[3:0] << 4;
 			endcase
-			
-/*			
-			if((color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
-				vga_data = white;  //white
+			*/
+			if(sflag&&(scolor_bit>>sh_offset)&12'h001 == 1'b1) //显示帧率和分数
+				vga_data <= 24'hff00ff;
+ 			else if(flag&&(color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
+				vga_data <= white;  //white
 			else 
-				vga_data = black;  //black			
-*/
+				vga_data <= black;  //black			
+
 	end
 	
 	
 	assign LEDR[0]=gameover;
 	
+	
+	/*
 	always @ (posedge CLOCK_50) begin //状态转换
 		case(state)
 			WEL_STATE:begin
@@ -324,16 +342,18 @@ module Game(
 
 		endcase
 	end
-	/**/
+	*/
 	
 	//计算图片地址
-	assign addr = h_addr<<9|(v_addr&9'b111111111);
+	//assign addr = h_addr<<9|(v_addr&9'b111111111);
 	
 	//欢迎界面
 	//welROM welcome(addr,VGA_CLK,wel_data);
 	
 	//结束界面
 	//endROM gameend(addr,VGA_CLK,end_data);
+	
+	
 	
 	//计算帧率
 	always @ (posedge dis_clk) begin
@@ -343,6 +363,47 @@ module Game(
 			fps<=fps+8'd1;
 	end
 	
+	assign fps_ten = fps/10;
+	assign fps_one = fps%10;
 	
+	assign score_ten = score/10;
+	assign score_one = score%10;
+	
+	always @ (posedge VGA_CLK) begin  //分数和帧率显示的地址处理
+		
+		if(v_addr>=10'd0&&v_addr<10'd16) begin //output fps
+			if(h_addr>=10'd620&&h_addr<10'd629) begin //十位
+				sp_addr <= (8'h30+fps_ten)<<4+v_addr;
+				sh_offset <= h_addr - 10'd620;
+				sflag <= 1'b1;
+			end
+			else if(h_addr>=10'd630&&h_addr<10'd639) begin //个位
+				sp_addr <= (8'h30+fps_one)<<4+v_addr;
+				sh_offset <= h_addr - 10'd630;
+				sflag <= 1'b1;
+			end
+			else
+				sflag <= 1'b0;
+		end
+		else if(v_addr>=10'd17&&v_addr<10'd23) begin //output score
+			if(h_addr>=10'd620&&h_addr<10'd629) begin //十位
+				sp_addr <= (8'h30+score_ten)<<4+v_addr-10'd17;
+				sh_offset <= h_addr - 10'd620;
+				sflag <= 1'b1;
+			end
+			else if(h_addr>=10'd630&&h_addr<10'd639) begin //个位
+				sp_addr <= (8'h30+score_one)<<4+v_addr-10'd17;
+				sh_offset <= h_addr - 10'd630;
+				sflag <= 1'b1;
+			end
+			else
+				sflag <= 1'b0;
+		end
+		else
+			sflag <= 1'b0;
+			
+	end
+	
+	Lattice_ROM num_rom(.clk(CLOCK_50), .outaddr(sp_addr), .dout(scolor_bit)); 
 	
 endmodule 
