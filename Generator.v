@@ -34,6 +34,6 @@ module Generator(clk,ch,speed,x,y);
 	 assign fake = ran_ch==8||ran_ch==18||ran_ch==14||ran_ch==19||ran_ch==25;
 	 assign ch = 8'd65 + ran_ch%26 + fake;
 	 
-	 assign speed = ran_speed%3 + 1;
+	 assign speed = ran_speed%2 + 1;
 
 endmodule 
