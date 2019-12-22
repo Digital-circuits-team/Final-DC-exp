@@ -113,15 +113,16 @@ module Game(
 	reg remove_flag;
 	
 	reg [7:0] score;//分数
-	reg [7:0] fps;//帧率
+	reg [7:0] fps,fps_reg;//帧率
 	//state contrl
 	wire [19:0] addr;
 	wire [11:0] wel_data;
 	wire [11:0] end_data;
 	reg clk_en;
 	reg reset;
-	wire dis_clk;
-
+	//wire dis_clk;
+	
+	wire flash_flag;
 	
 	initial begin
 	/*
@@ -131,7 +132,7 @@ module Game(
 		*/
 		reset=1'b0;
 		clk_en=1'b1;
-		state=2'd1;
+		state=PLAY_STATE;
 		fps=8'd0;
 		
 		gameover=1'b0;
@@ -154,24 +155,24 @@ module Game(
 	);
 	
 	//生成dis_clk
+	/*
 	clkgen #(25000000) my_disclk(
 		.clkin(CLOCK_50), 
 		.rst(reset), 
 		.clken(clk_en), 
 		.clkout(dis_clk) 
 	);
-	
+	*/
 	//用于随机生成字符的时钟
 	clkgen #(2) my_generator_clk(
 		.clkin(CLOCK_50), 
-		.rst(reset), 
-		.clken(clk_en), 
+		.rst(1'b0), 
+		.clken(1'b1), 
 		.clkout(generator_clk) 
 	);
 	//随机生成字符
 	Generator gen(.clk(generator_clk),.ch(char),.speed(tmp_speed),.x(tmp_x),.y(tmp_y));
-	//hex_decoder a(generator_clk,get_asc,{HEX3,HEX2});
-	hex_decoder s(1'b1,score,{HEX1,HEX0});
+	//hex_decoder s(1'b1,score,{HEX1,HEX0});
 
 	
 	//点阵ROM，取出字模信息color_bit
@@ -181,7 +182,7 @@ module Game(
 	ascii_ram ram(  //字符显存，写入char/读出get_asc
 		.data(char),
 		.rdaddress(outaddr),
-		.rdclock(dis_clk),
+		.rdclock(VGA_CLK),
 		.wraddress(inaddr),
 		.wrclock(generator_clk),
 		.wren(1'b1),
@@ -214,7 +215,7 @@ module Game(
 	assign rom_outaddr=get_asc_12bit + v_offset;
 	
 	//生成moveable
-	always @ (posedge dis_clk) begin 
+	always @ (posedge VGA_CLK) begin 
 		countclk=countclk+1'b1;
 		if(countclk==19'd420000)begin
 			count=count+6'd1;
@@ -229,7 +230,7 @@ module Game(
 		end
 	end
 	
-	always @ (posedge dis_clk) begin   //获取字符内列信息,no problem
+	always @ (posedge VGA_CLK) begin   //获取字符内列信息,no problem
 		if(columnTable[h_addr] == 1'b1) begin  //当前扫描处有新的字符
 			charIndex=h_addr;
 			h_offset=10'd0;
@@ -240,7 +241,7 @@ module Game(
 		end
 	end
 	
-	always @ (posedge dis_clk) begin   //获取字符内行信息,no problem
+	always @ (posedge VGA_CLK) begin   //获取字符内行信息,no problem
 		if(v_addr>=offset[charIndex]&&offset[charIndex]+4'd15>=v_addr) begin   
 			v_offset<=(v_addr-offset[charIndex])&10'b0000001111;
 			flag<=1'b1;
@@ -252,14 +253,19 @@ module Game(
 	end
 	
 	
-	always @ (posedge dis_clk) begin  //字符产生及下滑
+	always @ (posedge VGA_CLK) begin  //字符产生及下滑
 		if(generator_clk)begin  //生成字符，设置offset和speed
 			offset[tmp_y][8:0]<=tmp_x;
 			speed[tmp_y][2:0]<=tmp_speed;
 			columnTable[tmp_y]<=1'b1;
 		end
 		else begin end
-		if(remove_flag==1'b1&&get_asc==press)begin  //字符消除
+		if(state!=PLAY_STATE) begin //不在游戏状态，将所有变量清空
+			speed[charIndex]<=3'd0;
+			offset[charIndex]<=10'd0;
+			columnTable[charIndex]<=1'b0;			
+		end
+		else if(remove_flag==1'b1&&get_asc==press)begin  //字符消除
 				speed[charIndex]<=3'd0;
 				offset[charIndex]<=10'd520;
 				columnTable[charIndex]<=1'b0;
@@ -299,9 +305,9 @@ module Game(
 							//vga_data <= end_data[11:8] << 20 | end_data[7:4] << 12 | end_data[3:0] << 4;
 			endcase
 			*/
-			if(sflag&&(scolor_bit>>sh_offset)&12'h001 == 1'b1) //显示帧率和分数
+			if(sflag==1'b1&&(scolor_bit>>sh_offset)&12'h001 == 1'b1) //显示帧率和分数
 				vga_data <= 24'hff00ff;
- 			else if(flag&&(color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
+ 			else if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
 				vga_data <= white;  //white
 			else 
 				vga_data <= black;  //black			
@@ -356,43 +362,56 @@ module Game(
 	
 	
 	//计算帧率
-	always @ (posedge dis_clk) begin
-		if(generator_clk)
+	clkgen #(1) fpsclk(CLOCK_50,1'b0,1'b1,fpsclk);
+	assign flash_flag = h_addr == 10'd320 && v_addr == 10'd240;
+	always @ (posedge VGA_CLK) begin
+		if(fpsclk)
+			fps_reg<=fps;
 			fps<=8'd0;
-		else
+		else if(flag)
 			fps<=fps+8'd1;
+		else 
+			fps<=fps;
 	end
 	
-	assign fps_ten = fps/10;
-	assign fps_one = fps%10;
+	assign fps_ten = 8'h30+fps_reg/10;
+	assign fps_one = 8'h30+fps_reg%10;
 	
-	assign score_ten = score/10;
-	assign score_one = score%10;
+	assign score_ten = 8'h30+score/10;
+	assign score_one = 8'h30+score%10;
+	
+	/*
+	assign fps_one = 8'h31;
+	assign fps_ten = 8'h32;
+	assign score_one = 8'h33;
+	assign score_ten = 8'h34;
+	*/
+	
 	
 	always @ (posedge VGA_CLK) begin  //分数和帧率显示的地址处理
 		
 		if(v_addr>=10'd0&&v_addr<10'd16) begin //output fps
 			if(h_addr>=10'd620&&h_addr<10'd629) begin //十位
-				sp_addr <= (8'h30+fps_ten)<<4+v_addr;
+				sp_addr <= (fps_ten<<4)+v_addr;
 				sh_offset <= h_addr - 10'd620;
 				sflag <= 1'b1;
 			end
 			else if(h_addr>=10'd630&&h_addr<10'd639) begin //个位
-				sp_addr <= (8'h30+fps_one)<<4+v_addr;
+				sp_addr <= (fps_one<<4)+v_addr;
 				sh_offset <= h_addr - 10'd630;
 				sflag <= 1'b1;
 			end
 			else
 				sflag <= 1'b0;
 		end
-		else if(v_addr>=10'd17&&v_addr<10'd23) begin //output score
+		else if(v_addr>=10'd17&&v_addr<10'd33) begin //output score
 			if(h_addr>=10'd620&&h_addr<10'd629) begin //十位
-				sp_addr <= (8'h30+score_ten)<<4+v_addr-10'd17;
+				sp_addr <= (score_ten<<4)+v_addr-10'd17;
 				sh_offset <= h_addr - 10'd620;
 				sflag <= 1'b1;
 			end
 			else if(h_addr>=10'd630&&h_addr<10'd639) begin //个位
-				sp_addr <= (8'h30+score_one)<<4+v_addr-10'd17;
+				sp_addr <= (score_one<<4)+v_addr-10'd17;
 				sh_offset <= h_addr - 10'd630;
 				sflag <= 1'b1;
 			end
