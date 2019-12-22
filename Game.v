@@ -129,8 +129,8 @@ module Game(
 		clk_en=1'b0;
 		state=2'd0;
 		*/
-		clk_en=1'b1;
-		state=PLAY_STATE;
+		clk_en=1'b0;
+		state=WEL_STATE;
 		fps=8'd0;
 		pressing=1'b0;
 		gameover=1'b0;
@@ -156,7 +156,7 @@ module Game(
 	clkgen #(2) my_generator_clk(
 		.clkin(CLOCK_50), 
 		.rst(1'b0), 
-		.clken(1'b1), 
+		.clken(clk_en), 
 		.clkout(generator_clk) 
 	);
 	//随机生成字符
@@ -251,7 +251,7 @@ module Game(
 			columnTable[tmp_y]<=1'b1;
 		end
 		else begin end
-		if(state==END_STATE) begin //不在游戏状态，将所有变量清空
+		if(state!=PLAY_STATE) begin //不在游戏状态，将所有变量清空
 			speed[charIndex]<=3'd0;
 			offset[charIndex]<=10'd0;
 			columnTable[charIndex]<=1'b0;	
@@ -320,6 +320,7 @@ module Game(
 						pressing<=1'b1;
 					end
 					else begin
+						clk_en<=1'b1;
 						pressing<=1'b1;
 						score<=8'd0;
 						state<=PLAY_STATE;//到下一个状态
@@ -343,6 +344,7 @@ module Game(
 				
 				
 				if(gameover) begin
+					clk_en<=1'b0;
 					pressing<=1'b1;
 					state <= END_STATE;
 				end
@@ -429,6 +431,7 @@ module Game(
 			
 	end
 	assign LEDR[1]=pressing;
+	
 	Lattice_ROM num_rom(.clk(CLOCK_50), .outaddr(sp_addr), .dout(scolor_bit)); 
 	
 endmodule 
