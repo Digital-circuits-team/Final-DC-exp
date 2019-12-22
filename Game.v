@@ -116,8 +116,8 @@ module Game(
 	reg [7:0] fps,fps_reg;//帧率
 	//state contrl
 	wire [19:0] addr;
-	wire [11:0] wel_data;
-	wire [11:0] end_data;
+	wire [2:0] wel_data;
+	wire [2:0] end_data;
 	reg clk_en;
 	reg reset;
 	reg pressing;
@@ -280,8 +280,10 @@ module Game(
 	always @ (posedge VGA_CLK) begin   //设置vga_data，显示
 			//界面状态机
 			case(state)
-				WEL_STATE: vga_data <= 24'hff00ff;
-							//vga_data <= wel_data[11:8] << 20 | wel_data[7:4] << 12 | wel_data[3:0] << 4;
+				WEL_STATE: //vga_data <= 24'hff00ff;
+					
+					vga_data <= wel_data[2]<<23 | wel_data[1] <<15 | wel_data[0] << 7;
+				
 				PLAY_STATE:     //游戏状态
 				begin
 					if(sflag==1'b1&&(scolor_bit>>sh_offset)&12'h001 == 1'b1) //显示帧率和分数
@@ -291,8 +293,10 @@ module Game(
 					else 
 						vga_data <= black;  //black					
 				end
-				END_STATE: vga_data <= 24'h00ffff; 
-							//vga_data <= end_data[11:8] << 20 | end_data[7:4] << 12 | end_data[3:0] << 4;
+				END_STATE: //vga_data <= 24'h00ffff; 
+			
+					vga_data <= end_data[2]<<23 | end_data[1] <<15 | end_data[0] << 7;
+			
 			endcase
 	end
 	
@@ -301,7 +305,7 @@ module Game(
 	
 	
 	
-	always @ (posedge VGA_CLK) begin //状态转换
+	always @ (posedge CLOCK_50) begin //状态转换
 		case(state)
 			WEL_STATE:begin
 			
@@ -328,6 +332,7 @@ module Game(
 					pressing<=1'b0;
 					state <= END_STATE;
 				end
+		
 				
 			end
 			END_STATE:begin
@@ -336,8 +341,7 @@ module Game(
 						pressing<=1'b1;
 					end
 					else begin
-						pressing<=1'b1;
-					
+						pressing<=1'b1;					
 						state <= WEL_STATE;
 					end
 				end
@@ -351,13 +355,13 @@ module Game(
 	
 	
 	//计算图片地址
-	//assign addr = h_addr<<9|(v_addr&9'b111111111);
+	assign addr = h_addr<<9|(v_addr&9'b111111111);
 	
 	//欢迎界面
-	//welROM welcome(addr,VGA_CLK,wel_data);
+	welROM welcome(addr,VGA_CLK,wel_data);
 	
 	//结束界面
-	//endROM gameend(addr,VGA_CLK,end_data);
+	endROM gameend(addr,VGA_CLK,end_data);
 	
 	
 	
