@@ -362,7 +362,7 @@ module Game(
 	
 	
 	//计算帧率
-	clkgen #(1) fpsclk(CLOCK_50,1'b0,1'b1,fpsclk);
+	clkgen #(1) fps_clk(CLOCK_50,1'b0,1'b1,fpsclk);
 	assign flash_flag = h_addr == 10'd320 && v_addr == 10'd240;
 	always @ (posedge VGA_CLK) begin
 		if(fpsclk) begin
