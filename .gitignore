@@ -10,4 +10,6 @@ output_files/
 !/*.mif
 !/*.hex
 !img
-
+!/simulation
+/simulation/modelsim/*
+!/simulation/modelsim/*.vt
