@@ -50,7 +50,7 @@ module Game(
 	parameter another_bound = 10'd500;
 	parameter white = 24'hFFFFFF;
 	parameter black = 24'h000000;
-	
+	parameter skyblue = 24'h00CCFF;
 	parameter WEL_STATE = 2'd0;
 	parameter PLAY_STATE =2'd1;
 	parameter END_STATE = 2'd2;
@@ -311,8 +311,10 @@ module Game(
 						vga_data <= 24'hff00ff;
 					else if(flag==1'b1&&(color_bit>>h_offset)&12'h001 == 1'b1) //取出的一位bit信息为1 
 						vga_data <= white;  //white
+					else if(h_addr>10'd4&&h_addr<10'd476&&v_addr>10'd4&&v_addr<10'd636)//draw frame
+						vga_data <= black;
 					else 
-						vga_data <= black;  //black					
+						vga_data <= skyblue;  					
 				end
 				END_STATE: //vga_data <= 24'h00ffff; 
 			
