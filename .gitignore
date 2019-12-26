@@ -13,3 +13,4 @@ output_files/
 !/simulation
 /simulation/modelsim/*
 !/simulation/modelsim/*.vt
+!/reportIMG
