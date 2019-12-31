@@ -75,9 +75,6 @@ module Game(
 	wire [9:0] h_addr;
 	wire [9:0] v_addr;
 	
-
-	//wire en;  //字符显存写入使能端
-	
 	//asc_ram
 	wire [9:0] inaddr;  //写入字符显存中的地址
 	wire [9:0] outaddr;  //读取字符显存中该地址
@@ -96,8 +93,8 @@ module Game(
 	//FSM
 	wire [7:0] press;  //键盘按键
 	
-	reg flag;
 	//other
+	reg flag;  //辅组判断当前扫描点所获取到的1bit信息是否有效
 	reg [9:0] offset[639:0]; //行偏移量
 	wire [2:0] speed;  //速度
 	wire [2:0] wirte_speed;
