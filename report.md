@@ -103,7 +103,7 @@
 
 ##### 2.模块化设计及组内分工
 
-此次实验主要分为```7```个模块，分别是**通用时钟生成模块clkgen**，**VGA控制器模块**，**键盘控制器模块FSM**，**字符字模点阵Lattice_ROM模块**，**字符速度显存asc_speed模块**，**随机数生成Generator模块**，以及**顶层实体Game模块**。
+此次实验主要分为`7`个模块，分别是**通用时钟生成模块clkgen**，**VGA控制器模块**，**键盘控制器模块FSM**，**字符字模点阵Lattice_ROM模块**，**字符速度显存asc_speed模块**，**随机数生成Generator模块**，以及**顶层实体Game模块**。
 
 <span style='color:red;background:white;font-size:16;font-family:字体;'>TODO：模块之间的组织和联系（流程图？）</span>
 
