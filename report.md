@@ -1,28 +1,81 @@
-
-
-## <center>《数字逻辑电路》实验报告</center>
-
+# 数电实验报告
 
 
 
+---
 
-
-
-# <center>大实验  复刻打字游戏</center>
+## 实验十二				复刻打字游戏
 
 
 
 
 
-#### <center>小组成员：刘国涛&李翰</center>
 
-#### <center> 学号：181860055 & 181860044</center>
 
-#### <center>班级：（1）班</center>
+​												**计算机科学与技术系     **
 
-#### <center>邮箱：181860055@smail.nju.edu.com&181860044@smail.nju.edu.com</center>
 
-#### <center>实验时间：2019.12.22</center>
+
+​												**181860055 		[刘国涛](https://github.com/youngstudent2)**  
+
+​												**181860044		 [李翰](https://github.com/Eternity-AIBN)** 
+
+
+
+​									
+
+​				**项目地址：**[Github](https://github.com/Digital-circuits-team/Final-DC-exp)
+
+
+
+​									
+
+​		
+
+
+
+
+
+**2019年12月22日**					
+
+
+
+
+
+
+
+
+
+------
+
+
+
+
+
+## 目录
+
+
+
+
+
+
+
+[TOC]
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
 
 
 
@@ -60,31 +113,82 @@
 
 ### 4.设计思路、流程图
 
-##### 1.数据结构及整体思路
+为了实现目标功能，在前期提出以下问题：
 
-> 首先此实验大致包括以下三个内容:
+>- 如何生成字符
+>    - 需要生成那些信息
+>    - 生成后的信息如何存储
+>    - 如何实现随机生成
+>- 如何实现字符的平滑下落
+>    - 采用什么样的显存
+>    - 如何实现字符的下落
+>    - 如何实现字符的平滑下落
+>    - 如何针对不同速度的字符实现平滑下落
+>- 如何通过键盘删除对应字符
+>    - 如何快速地找到显存中对应的字符
+>    - 通过什么方式删除
+>- FPS和分数如何计算并显示
 >
-> ```mermaid
-> graph TD
-> 	p1(随机产生字符)
-> 	p2(字符平滑下落)
-> 	p3(键盘消除字符)
-> 	p1-->p2
-> 	p2-->p3
-> ```
+>
 
-实验中每个字符具有如下属性:
+##### 1.阶段划分
 
-|     属性      | 存储空间 |
-| :-----------: | :------: |
-| 对应的ASCII码 |  8 bits  |
-|     速度      |  3 bits  |
-|    横坐标     |  9 bits  |
-|    纵坐标     | 10 bits  |
+根据提出的问题，我们将实验划分为以下四个阶段：
+
+ ```mermaid
+graph LR
+ 	p1(随机产生字符)
+ 	p2(字符平滑下落)
+ 	p3(键盘消除字符)
+ 	p4(实现FPS和分数的显示)
+ 	p5("实现界面状态机(附加功能)")
+ 	p1-->p2
+ 	p2-->p3
+ 	p3-->p4
+ 	p4-->p5
+ ```
+
+##### 2.数据结构
+
+**`Generator`产生的字符信息：**
+
+一个字符表项共30位，各位区段对应含义如下
+
+| [29:22] | [21:19] | [18:10] | [9:0] |
+| :-----: | :-----: | :-----: | :---: |
+|   ch    |  speed  |    x    |   y   |
+
+**用于存储生成的字符、实现字符下滑、实现键盘消除的结构：**
+
+```c++
+typedef struct{
+    bool ex;//使用寄存器实现，标志该列是否存在字符
+    char ch;//使用RAM实现，记录对应列存在的字符ASCII码
+    int offset;//使用寄存器实现，记录当前列的行偏移
+    int speed;//使用RAM实现，记录当前列存在的字符的速度
+}ColumnInfo;
+
+typedef struct{
+	ColumnInfo col[640];    
+}ColumnTable;
+```
+
+
+
+##### 3.各阶段大致思路
 
 ###### 随机产生字符
 
 通过`Generator`模块随机生成如下字符信息： <span style='color:purple;background:white;font-size:16;font-family:字体;'>字符对应的ASCII码、速度及横纵坐标</span> 
+
+`Generator`通过调用LSFR实现的随机序列发生器模块`random`，为四个属性生成以下范围的随机数：
+
+|  属性  | 随机数范围 |
+| :----: | :--------: |
+| ASCII  |  ‘A’-‘Z’   |
+| speed  |   (1,3)    |
+| 列坐标 |  [0,640)   |
+| 行坐标 |   恒为0    |
 
 ###### 字符平滑下落
 
@@ -94,14 +198,16 @@
 
 当键盘按下按键时，在屏幕上找到相应字符，可以通过如下设置：
 
->  <span style='color:purple;background:none;font-size:16;font-family:字体;'>offset[a]=8'd520</span> 
->  <span style='color:purple;background:none;font-size:16;font-family:字体;'>speed[a]=3'd0</span> 
+```verilog
+offset[a]=8'd520;
+speed[a]=3'd0;
+```
 
 即将字符纵坐标设为一个大于显示器高度的值，同时速度设为 0 ，如此字符便不会在屏幕上出现，同时也不会由于一直加上 <span style='color:purple;background:white;font-size:16;font-family:字体;'>speed[a]</span> 而导致 <span style='color:purple;background:white;font-size:16;font-family:字体;'>offset[a]</span> 溢出变为0而重新出现在屏幕中。当该位置产生新的字符时，只需根据`Generator`模块提供的信息设置即可。
 
 
 
-##### 2.模块化设计及组内分工
+##### 4.模块化设计及组内分工
 
 此次实验主要分为`7`个模块，分别是**通用时钟生成模块clkgen**，**VGA控制器模块**，**键盘控制器模块FSM**，**字符字模点阵Lattice_ROM模块**，**字符速度显存asc_speed模块**，**随机数生成Generator模块**，以及**顶层实体Game模块**。
 
@@ -111,7 +217,7 @@
 
 
 
-##### 3.相关变量
+##### 5.相关变量
 
 此次实验中除了时钟信号、与 VGA 和键盘相关的一些输入输出变量之外，在顶层实体中对于每个模块以及几个always块还需另外定义一些变量，大致如下：
 
@@ -232,7 +338,72 @@ wire flash_flag;
 
 ##### 5.设计随机生成模块
 
-<span style='color:red;background:white;font-size:16;font-family:字体;'>TODO：补充之</span>
+`Generator`调用LSFR实现的八位和十二位随机数生成器生成随机数，`Generator`模块实现如下：
+
+```verilog
+module Generator(clk,ch,speed,x,y);
+     input clk;
+	 output [7:0] ch;
+     output [2:0] speed;
+	 output [8:0] x;
+     output [9:0] y;
+	
+	 wire [11:0] ran_y;
+	 wire [7:0] ran_ch;
+	 wire [7:0] ran_speed;
+	 
+	 wire fake;
+	 
+    random8 #(2) random_speed(
+        .clk(clk),
+        .randomNum(ran_speed)
+    );
+
+    random12 #(315) random_y(
+        .clk(clk),
+        .randomNum(ran_y)
+    );
+	 
+	random8 #(9) random_ch(
+		.clk(clk),
+		.randomNum(ran_ch)
+	);
+	
+	//生成属性值
+    assign y = 11'hA+(ran_y&11'h3f)*9;
+	assign x = 9'd0;
+	assign ch = 8'd65 + ran_ch%26;
+	assign speed = ran_speed%2 + 1;
+endmodule 
+```
+
+随机数生成器（八位）实现如下：
+
+```verilog
+module random8(clk,randomNum);
+    input clk;
+    output reg [7:0] randomNum;
+    reg lin;
+	 parameter seed = 8'd0;
+	 initial begin
+			randomNum=seed;
+	 end
+    always @ (posedge clk) begin
+			if(randomNum==8'd0)
+              randomNum=8'hff;
+         else begin
+              lin = randomNum[4]^randomNum[3]^randomNum[2]^randomNum[0];
+              randomNum = {lin,randomNum[7:1]};
+				  
+              if(randomNum==8'hff)
+                  randomNum = 8'd0;
+              else
+                  randomNum = randomNum;
+         end        
+    end
+
+endmodule 
+```
 
 ##### 6.初步设计顶层实体Game模块
 
@@ -405,7 +576,7 @@ else begin offset[charIndex]<=offset[charIndex]; end
 
 ##### 9.完善程序，加入计分以及帧率显示，增加开始界面和结束界面
 
-<span style='color:red;background:white;font-size:16;font-family:字体;'>TODO：补充之</span>
+
 
 
 
@@ -419,7 +590,7 @@ else begin offset[charIndex]<=offset[charIndex]; end
 
 ### 7.实验结果
 
-###### 下载运行结果：课上已验收
+**下载运行结果：课上已验收**
 
 
 
