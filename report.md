@@ -86,7 +86,6 @@
 
 
 
-
 ### 1.实验目的
 
 本次实验为自选大实验，主要目的是在一个较大的项目综合运用本学期所学内容，加深对知识的理解，并在一定程度上锻炼对一个大项目的分析、拆解及整合能力。
@@ -207,13 +206,13 @@ speed[a]=3'd0;
 
 
 
-##### 4.模块化设计及组内分工
+##### 4.模块化设计
 
 此次实验主要分为`7`个模块，分别是**通用时钟生成模块clkgen**，**VGA控制器模块**，**键盘控制器模块FSM**，**字符字模点阵Lattice_ROM模块**，**字符速度显存asc_speed模块**，**随机数生成Generator模块**，以及**顶层实体Game模块**。
 
 <span style='color:red;background:white;font-size:16;font-family:字体;'>TODO：模块之间的组织和联系（流程图？）</span>
 
-<span style='color:red;background:white;font-size:16;font-family:字体;'>TODO：分工情况</span>
+
 
 
 
@@ -574,11 +573,247 @@ else begin offset[charIndex]<=offset[charIndex]; end
 
 至此基本功能已经实现完毕.
 
-##### 9.完善程序，加入计分以及帧率显示，增加开始界面和结束界面
+##### 9.计分
+
+初步实现：字符下滑模块中消除字符分支进行计分
+
+```verilog
+if(remove_flag==1'b1&&get_asc==press)begin  //字符消除
+			reg_speed<=3'd0;
+			offset[charIndex]<=10'd520;
+			columnTable[charIndex]<=1'b0;
+			remove_flag<=1'b0;
+			//计分
+			score <= score + 8'd1;
+end
+```
+
+改进：在后面实现界面切换功能时，需要在重新进入游戏状态时将score清零，所以需要将计分移至状态机的实现当中，根据`remove_flag`判断分数是否增加
+
+```verilog
+always @ (posedge CLOCK_50) begin //状态转换
+    case(state)
+			WEL_STATE:
+			PLAY_STATE:begin
+				
+				if(remove_flag==1'b0)begin //解决由于时序导致的积分问题
+					if(score_flag==1'b1) 
+						score_flag<=1'b1;
+					else begin	
+                        //计分
+						score<=score+8'd1;
+						score_flag<=1'b1;
+					end
+				end
+				else
+					score_flag<=1'b0;
+				
+				
+                if(gameover) begin //转移至结束状态
+					clk_en<=1'b0;
+					pressing<=1'b1;
+					state <= END_STATE;
+				end			
+			end
+			END_STATE:
+
+
+		endcase
+	end
+```
+
+值得注意的是，这里由于状态切换和`remove_flag`设置采用的时钟不同，为了保证在一个`VGA_CLK`周期内，分数只增加一次，采用了如下结构：
+
+```verilog
+if(remove_flag==1'b0)begin 
+	if(score_flag==1'b1) 
+        score_flag<=1'b1;
+    else begin	
+        //计分
+		score<=score+8'd1;
+		score_flag<=1'b1;
+	end
+end
+else
+	score_flag<=1'b0;
+```
+
+该结构保证了在一次`remove_flag`为1的周期里分数只被计算一次
+
+##### 10.FPS计数
+
+VGA_CLK每525*800=420000个周期扫描过一帧，因此通过时钟`VGA_CLK`进行驱动fps计数，另生成一一秒的时钟`fpsclk`进行显示驱动
+
+```verilog
+	clkgen #(1) fps_clk(CLOCK_50,1'b0,1'b1,fpsclk);
+	
+	always @ (posedge fpsclk) 
+		fps_reg=fps<<1;
+```
+
+##### FPS和分数显示
+
+计算字模点阵中的地址
+
+```verilog
+	assign fps_ten = 8'h30+fps_reg/10;
+	assign fps_one = 8'h30+fps_reg%10;
+	
+	assign score_ten = 8'h30+score/10;
+	assign score_one = 8'h30+score%10;
+	
+	
+	always @ (posedge VGA_CLK) begin  //分数和帧率显示的地址处理
+		
+		if(v_addr>=10'd0&&v_addr<10'd16) begin //output fps
+			if(h_addr>=10'd620&&h_addr<10'd629) begin //十位
+				sp_addr <= (fps_ten<<4)+v_addr;
+				sh_offset <= h_addr - 10'd620;
+				sflag <= 1'b1;
+			end
+			else if(h_addr>=10'd630&&h_addr<10'd639) begin //个位
+				sp_addr <= (fps_one<<4)+v_addr;
+				sh_offset <= h_addr - 10'd630;
+				sflag <= 1'b1;
+			end
+			else
+				sflag <= 1'b0;
+		end
+		else if(v_addr>=10'd17&&v_addr<10'd33) begin //output score
+			if(h_addr>=10'd620&&h_addr<10'd629) begin //十位
+				sp_addr <= (score_ten<<4)+v_addr-10'd17;
+				sh_offset <= h_addr - 10'd620;
+				sflag <= 1'b1;
+			end
+			else if(h_addr>=10'd630&&h_addr<10'd639) begin //个位
+				sp_addr <= (score_one<<4)+v_addr-10'd17;
+				sh_offset <= h_addr - 10'd630;
+				sflag <= 1'b1;
+			end
+			else
+				sflag <= 1'b0;
+		end
+		else
+			sflag <= 1'b0;
+			
+	end
+	assign LEDR[1]=pressing;
+	
+	Lattice_ROM num_rom(.clk(CLOCK_50), .outaddr(sp_addr), .dout(scolor_bit)); 
+```
+
+显示：
+
+```verilog
+if(sflag==1'b1&&(scolor_bit>>sh_offset)&12'h001 == 1'b1) //显示帧率和分数
+	vga_data <= 24'hff00ff;
+```
+
+##### 界面状态机设计
+
+```mermaid
+graph LR
+	s1(开始界面)
+	s2(游戏界面)
+	s3(结束界面)
+	s1--回车键-->s2
+	s2--gameover-->s3
+	s3--回车键-->s1
+```
+
+###### 状态转换实现
+
+```verilog
+	always @ (posedge CLOCK_50) begin //状态转换
+		case(state)
+			WEL_STATE:begin
+			
+				if(press==8'd13) begin
+					if(pressing)begin
+						pressing<=1'b1;
+					end
+					else begin
+						clk_en<=1'b1;
+						pressing<=1'b1;
+						score<=8'd0;
+						state<=PLAY_STATE;//到下一个状态
+					end
+				end
+				else
+					pressing<=1'b0;
+			end
+			PLAY_STATE:begin
+				
+				if(remove_flag==1'b0)begin //解决由于时序导致的积分问题
+					if(score_flag==1'b1) 
+						score_flag<=1'b1;
+					else begin	
+						score<=score+8'd1;
+						score_flag<=1'b1;
+					end
+				end
+				else
+					score_flag<=1'b0;
+				
+				
+				if(gameover) begin
+					clk_en<=1'b0;
+					pressing<=1'b1;
+					state <= END_STATE;
+				end
+				
+			
+			end
+			END_STATE:begin
+				if(press==8'd13)begin
+					if(pressing)begin
+						pressing<=1'b1;
+					end
+					else begin
+						pressing<=1'b1;					
+						state <= WEL_STATE;
+					end
+				end
+				else
+					pressing<=1'b0;
+					
+			end
+
+		endcase
+	end
+```
+
+同样值得注意的是，在`WEL_STATE`和`END_STATE`状态下，对回车键的响应也采用了与计分相同的时序同步结构。是因为这里采用的时钟是50MHz，该结构也可以保证一次回车只切换一个状态
+
+```verilog
+				if(press==8'd13)begin
+					if(pressing)begin
+						pressing<=1'b1;
+					end
+					else begin
+						pressing<=1'b1;					
+						state <= next_state;
+					end
+				end
+				else
+					pressing<=1'b0;
+```
 
 
 
+###### 界面设计
 
+在分辨率640*480下，如果采用12bitRGB存储两张图片，则需要占用约7MB的片内内存，显然这是不可行的。因此此处采用了3bitRGB
+
+在Photoshop中进行制作界面图片
+
+![QQ截图20200101160957](reportIMG/QQ截图20200101160957.png)
+
+保存为bmp文件后使用Pic2Mif将图片转换为mif文件
+
+![QQ截图20200101161200](reportIMG/QQ截图20200101161200.png)
+
+然后创建IP核，并以mif文件进行初始化
 
 ### 6.测试方法
 
