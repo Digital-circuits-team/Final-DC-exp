@@ -129,6 +129,7 @@
 ---
 
 - 工作量>30小时
+- 设计键盘消除逻辑
 - 完成对字符显示、字符存储、字符下滑、键盘消除等功能的代码实现
 - 实现顶层模块，完成对VGA显示模块、键盘模块的综合
 - 实现速度RAM、字符RAM
@@ -229,7 +230,13 @@ typedef struct{
 
 ###### 字符平滑下落
 
-在具体设计中采用一个由 ```640个8bit reg型变量```组成的数组 <span style='color:purple;background:white;font-size:16;font-family:字体;'>offset</span> 来储存某一个字符的坐标（如offset[a]则表示横坐标为a的字符的纵坐标是多少，此处约定不会有两个字符的横坐标相同）。同时相应的用另一个由 ```640个3bit reg型变量```组成的数组 <span style='color:purple;background:white;font-size:16;font-family:字体;'>speed</span> 来储存某一个字符的速度(约定速度范围是 <span style='color:blue;background:white;font-size:16;font-family:字体;'>1~7</span> )，如此即可通过 <span style='color:purple;background:white;font-size:16;font-family:字体;'>offset[a]=offset[a]+speed[a]</span> 更新某一字符的纵坐标以实现字符下滑效果。
+在具体设计中采用一个由 `640个8bit reg型变量`组成的列偏移量数组 <span style='color:purple;background:white;font-size:16;font-family:字体;'>offset</span> 来储存某一个字符的坐标（如offset[a]则表示横坐标为a的字符的纵坐标是多少，此处约定不会有两个字符的横坐标相同）。同时相应的用另一个由 `640个3bit reg型变量`组成的数组 <span style='color:purple;background:white;font-size:16;font-family:字体;'>speed</span> 来储存某一个字符的速度(约定速度范围是 <span style='color:blue;background:white;font-size:16;font-family:字体;'>1~7</span> )，如此即可通过 <span style='color:purple;background:white;font-size:16;font-family:字体;'>offset[a]=offset[a]+speed[a]</span> 更新某一字符的纵坐标以实现字符下滑效果。
+
+过程如图所示
+
+![1](reportIMG/1.png)
+
+> 另：为充分使用片内内存，speed数组后改为speed RAM
 
 ###### 键盘消除字符
 
@@ -248,7 +255,7 @@ speed[a]=3'd0;
 
 此次实验主要分为`8`个模块，分别是**通用时钟生成模块clkgen**，**VGA控制器模块**，**键盘控制器模块FSM**，**字符字模点阵Lattice_ROM模块**，**字符显存ascii_ram模块**，**字符速度显存asc_speed模块**，**随机数生成Generator模块**，以及**顶层实体Game模块**。
 
-上述模块之间的组织和联系大致如下：
+上述模块之间的组织和联系如下：
 
 ![image-20200102144915508](reportIMG/image-20200102144915508.png)
 
@@ -858,7 +865,7 @@ graph LR
 
 ### 7.测试方法
 
-#### 生成模块```Generator```：
+#### 生成模块`Generator`
 
 编写testbench文件：
 
@@ -925,7 +932,7 @@ end
 
 **运行结果：课上已验收**
 
-
+![IMG_20191222_224040](reportIMG/IMG_20191222_224040.jpg)
 
 ### 9.实验中遇到的问题及解决方法
 
@@ -949,9 +956,15 @@ end
 
 经讨论思考，增加一个变量用于标志是否以及消除过字符，若消除过则置１以使后续扫描过程中不再继续消除，且在每次松开按键后将该标志重新置０. 问题解决.
 
+### 10.可改进的地方
 
+1. 加入游戏难度逐渐提升机制，实现思路：根据分数改变字符生成速度
+2. 界面优化，实现思路：加入游戏背景、边框
+3. 加入生命机制，实现思路：加入生命变量`life`，在`life`为0时将`gameover`置1
+4. 加入游戏音效，实现思路：参照实验10
+5. 改进游戏逻辑，使其能够在同一列显示多个字符
 
-### 10.实验总结
+### 11.实验总结
 
 本次实验通过对FPGA进行游戏编程，使我们对效率和空间有了进一步的体会。另外，我们对硬件描述语言和并行编程的方式有了进一步的理解。
 
@@ -973,7 +986,7 @@ end
 
 
 
-
+---
 
 ### 附：被放弃的方案们
 
