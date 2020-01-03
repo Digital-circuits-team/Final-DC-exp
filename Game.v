@@ -117,13 +117,11 @@ module Game(
 	wire [19:0] addr;
 	wire [2:0] wel_data;
 	wire [2:0] end_data;
-	reg clk_en;
-	reg reset;
 	reg pressing;
-	wire flash_flag;
-	
+	reg clk_en;
+	//reg reset;
 	initial begin
-	/*
+		/*
 		reset=1'b0;
 		clk_en=1'b0;
 		state=2'd0;
